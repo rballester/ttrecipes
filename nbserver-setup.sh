@@ -2,17 +2,15 @@
 ## It is currently customized for Microsoft Azure Notebooks Library.
 
 install_dir="$HOME/library"
-repo_name="ttrecipes"
 repo_url="https://github.com/rballester/ttrecipes.git"
 repo_branch="master"
 
-if [ ! -d ${install_dir}/${repo_name} ]; then
-    cd ${install_dir} && git clone -b ${repo_branch} ${repo_url}
+cd ${install_dir}
+if [ ! -d ${install_dir}/ttrecipes ]; then
+    git clone -b ${repo_branch} ${repo_url}
 else
-    cd ${install_dir}/${repo_name} && git fetch && git checkout ${repo_branch} && git pull
+    git fetch && git checkout ${repo_branch} && git checkout . && git pull
 fi
-
-cd ${install_dir}/${repo_name}
 
 echo "Installing Python 3 packages..."
 pip3 install --user six numpy cython
