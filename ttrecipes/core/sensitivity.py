@@ -10,6 +10,7 @@ from __future__ import (absolute_import, division,
 from future.builtins import range
 
 import numpy as np
+import scipy as sp
 import tt
 
 import ttrecipes as tr

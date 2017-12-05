@@ -6,7 +6,6 @@ analysis metrics on N-dimensional black-box functions approximated with
 Tensor Trains.
 
 Todo:
-    * Add confidence intervals
     * Add derivative-based and histogram-based metrics
 
 """
@@ -22,6 +21,7 @@ Todo:
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import collections
+import functools
 import itertools
 import pprint
 import time
@@ -29,14 +29,15 @@ import time
 import numpy as np
 import scipy as sp
 import scipy.stats
+from tabulate import tabulate
 
 import tt
 import ttrecipes as ttr
 
 
-def var_metrics(fun, axes, default_bins=100, max_order=1, effective_threshold=0.95,
+def var_metrics(fun, axes, default_bins=100, max_order=2, effective_threshold=0.95,
                 sampling_mode='spatial', dist_fraction=0.00005,
-                eps=1e-5, verbose=False, cross_kwargs=None):
+                eps=1e-5, verbose=False, cross_kwargs=None, print_results=False):
     """Variance-based sensitivity analysis.
 
     User-friendly wrapper that conducts a general variance-based sensitivity
@@ -84,6 +85,7 @@ def var_metrics(fun, axes, default_bins=100, max_order=1, effective_threshold=0.
         verbose (bool, optional): Verbose messages. Defaults to False.
         cross_kwargs (:obj:`dict`, optional): Parameters for the cross
             approximations. Defaults to None.
+        print (bool, optional): Print results. Defaults to False.
 
     Returns:
         dict: A dictionary with the computed metrics and model information::
@@ -243,7 +245,9 @@ def var_metrics(fun, axes, default_bins=100, max_order=1, effective_threshold=0.
     if cross_kwargs is None:
         cross_kwargs = dict()
 
-    start = time.time()
+    if verbose:
+        print("\n-> Building surrogate model")
+    model_time = time.time()
     pdf = tt.vector.from_list([marg[np.newaxis, :, np.newaxis] for marg in marginals])
 
     def f_premultiplied(Xs):
@@ -251,8 +255,11 @@ def var_metrics(fun, axes, default_bins=100, max_order=1, effective_threshold=0.
 
     tt_pdf = ttr.core.cross(ticks_list, f_premultiplied, mode=mode, eps=eps,
                             verbose=verbose, **cross_kwargs)
-    model_build_time = time.time()
+    model_time = time.time() - model_time
 
+    if verbose:
+        print("\n-> Computing sensitivity metrics")
+    sa_time = time.time()
     st = ttr.core.sobol_tt(tt_pdf, pdf=pdf, premultiplied=True, eps=eps,
                            verbose=verbose, **cross_kwargs)
     tst = ttr.core.to_upper(st)
@@ -263,51 +270,106 @@ def var_metrics(fun, axes, default_bins=100, max_order=1, effective_threshold=0.
     shapley_values = ttr.core.semivalues(cst, ps='shapley')
     banzhaf_coleman_values = ttr.core.semivalues(cst, ps='banzhaf-coleman')
 
-    result = dict()
-    result['dimension_distribution'] = ttr.core.sensitivity.dimension_distribution(st)
-    result['mean_dimension'] = result['dimension_distribution'].dot(np.arange(1, N + 1))
-    result['effective_superposition'] = ttr.core.effective_dimension(
+    results = dict()
+    results['dimension_distribution'] = ttr.core.sensitivity.dimension_distribution(st)
+    results['mean_dimension'] = results['dimension_distribution'].dot(np.arange(1, N + 1))
+    results['effective_superposition'] = ttr.core.effective_dimension(
         st, effective_threshold, 'superposition')
-    result['effective_truncation'] = (dim, var, indices)
-    result['effective_successive'] = ttr.core.effective_dimension(
+    results['effective_truncation'] = (dim, var, indices)
+    results['effective_successive'] = ttr.core.effective_dimension(
         st, effective_threshold, 'successive')
-    sa_time = time.time() - model_build_time
+    sa_time = time.time() - sa_time
 
-    result['sobol_indices'] = dict()
-    result['total_sobol_indices'] = dict()
-    result['closed_sobol_indices'] = dict()
-    result['superset_sobol_indices'] = dict()
+    if verbose:
+        print("\n-> Exporting results")
+    results['sobol_indices'] = dict()
+    results['total_sobol_indices'] = dict()
+    results['closed_sobol_indices'] = dict()
+    results['superset_sobol_indices'] = dict()
     for order in range(1, max_order + 1):
         for idx in itertools.combinations(list(range(N)), order):
             key = tuple(names[i] for i in idx)
-            result['sobol_indices'][key] = ttr.core.set_choose(st, idx)
-            result['total_sobol_indices'][key] = ttr.core.set_choose(tst, idx)
-            result['closed_sobol_indices'][key] = ttr.core.set_choose(cst, idx)
-            result['superset_sobol_indices'][key] = ttr.core.set_choose(sst, idx)
+            results['sobol_indices'][key] = ttr.core.set_choose(st, idx)
+            results['total_sobol_indices'][key] = ttr.core.set_choose(tst, idx)
+            results['closed_sobol_indices'][key] = ttr.core.set_choose(cst, idx)
+            results['superset_sobol_indices'][key] = ttr.core.set_choose(sst, idx)
 
-    result['shapley_values'] = dict()
-    result['banzhaf_coleman_values'] = dict()
+    results['shapley_values'] = dict()
+    results['banzhaf_coleman_values'] = dict()
     for i, name in enumerate(names):
-        result['shapley_values'][name] = shapley_values[i]
-        result['banzhaf_coleman_values'][name] = banzhaf_coleman_values[i]
+        results['shapley_values'][name] = shapley_values[i]
+        results['banzhaf_coleman_values'][name] = banzhaf_coleman_values[i]
 
-    result['_tt_info'] = dict(
+    results['_tr_info'] = dict(
+        kind='var_metrics',
         axes=axes,
         default_bins=default_bins,
         effective_threshold=effective_threshold,
+        max_order=max_order,
         eps=eps,
         verbose=verbose,
         cross_kwargs=cross_kwargs,
         ticks_list=ticks_list,
         n_samples=f.n_samples,
-        model_build_time=model_build_time - start,
+        model_time=model_time,
         sa_time=sa_time,
         tt_pdf=tt_pdf,
         st=st,
         tst=tst
     )
 
-    return result
+    if print_results:
+        print_metrics(results)
+
+    return results
 
 
-#def print_metrics()
+def print_metrics(results, tablefmt="presto", floatfmt=".6f",
+                  numalign="decimal", stralign="left"):
+    assert('_tr_info' in results and
+           results['_tr_info']['kind'] == 'var_metrics')
+
+    tab_fn = functools.partial(tabulate, tablefmt=tablefmt, floatfmt=floatfmt,
+                               numalign=numalign, stralign=stralign)
+    axes = results['_tr_info']['axes']
+    max_order = results['_tr_info']['max_order']
+    names = [name for name, *rest in axes]
+
+    table = [(n, results['sobol_indices'][(n,)],
+              results['total_sobol_indices'][(n,)],
+              results['shapley_values'][n],
+              results['banzhaf_coleman_values'][n])
+             for n in names]
+    print("\n\n\t\t -- Sensitivity Indices --".upper())
+    print(tab_fn(table, headers=["Variable", "Sobol", "Total", "Shapley",
+                                 "Banzhaf-Coleman"]))
+
+    for order in range(2, max_order + 1):
+        table = []
+        for key in itertools.combinations(names, order):
+            table.append((*key, results['sobol_indices'][key],
+                          results['total_sobol_indices'][key],
+                          results['closed_sobol_indices'][key],
+                          results['superset_sobol_indices'][key]))
+
+        print("\n\n\t\t -- Sensitivity Indices (order {}) --".format(order).upper())
+        print(tab_fn(table, headers=[*["Variable {}".format(i+1) for i in range(order)],
+                                     "Sobol", "Total", "Closed", "Superset"]))
+
+    table = [('Mean dimension', results['mean_dimension']),
+             ('Effective (superposition)', *results['effective_superposition']),
+             ('Effective (successive)', *results['effective_successive']),
+             ('Effective (truncation)', results['effective_truncation'][0],
+              results['effective_truncation'][1], ", ".join(
+                  [names[i] for i in results['effective_truncation'][2]]))]
+
+    print(("\n\n\t\t -- Dimension metrics --".upper()))
+    print(tab_fn(table, headers=["Dimension Metric", "Value", "Rel. Variance",
+                                 "Variables"]))
+
+    cumul_dist = np.cumsum(results['dimension_distribution'])
+    table = [[i + 1, value, cumul_dist[i]]
+             for i, value in enumerate(results['dimension_distribution'])]
+    print("\n\n\t -- Dimension distribution --".upper())
+    print(tab_fn(table, headers=["Order", "Rel. Variance", "Cumul. Variance"]))
+    print("\n")

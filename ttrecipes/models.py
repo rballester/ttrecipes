@@ -200,10 +200,10 @@ def get_decay_poisson(d, span=10.0, hl_range=(3*(1.0/12.0), 3.0),
     assert d > 0
 
     def half_life_to_decay_rate(half_lives, year_fraction):
-        # decay rates as average number of atom decays per year_fraction
+        # decay rates as the fraction of the original number of atoms that decays per year_fraction
         return 1 - np.exp(- year_fraction * np.log(2) / np.asarray(half_lives))
 
-    def function(Xs, span):
+    def function(Xs, span, time_step):
         Xs = np.asarray(Xs)
         if Xs.ndim == 1:
             Xs = np.expand_dims(Xs, axis=0)
@@ -211,12 +211,12 @@ def get_decay_poisson(d, span=10.0, hl_range=(3*(1.0/12.0), 3.0),
         quantities = np.zeros((Xs.shape[0], n_products + 1))
         quantities[:, 0] = 1.0
 
-        # decay rates as average number of atom decays per day
+        # decay rates as average number of atom decays per time step
         # rates = 1 - np.exp(- day * math.log(2) / Xs)
         # rates = half_life_to_decay_rate(Xs, 1.0 / 365.0)
         rates = Xs
-        n_days = int(span * 365.0)
-        for d in range(n_days):
+        n_steps = int(span / time_step)
+        for d in range(n_steps):
             offsets = quantities[:, :n_products] * rates
             quantities[:, :n_products] -= offsets
             quantities[:, 1:] += offsets
@@ -226,7 +226,7 @@ def get_decay_poisson(d, span=10.0, hl_range=(3*(1.0/12.0), 3.0),
     decay_range = half_life_to_decay_rate(hl_range, time_step)[::-1]
     axes = make_unif_axes(d, bounds=decay_range, name_tmpl=name_tmpl)
 
-    return functools.partial(function, span=span), axes
+    return functools.partial(function, span=span, time_step=time_step), axes
 
 
 def get_borehole():
@@ -440,3 +440,166 @@ def get_fire_spread(wind_factor=1.0):
 
     return function, axes
 
+
+def get_robot_arm():
+    """Distance of a 4-segment robot arm's end to its origin over a plane (https://www.sfu.ca/~ssurjano/robot.html)
+
+    Note: variables are interleaved so as to reduce the TT rank
+
+    Args:
+        phi1 - phi4: angles of the four arm segments
+        L1 - L4: lengths of the four arm segments
+
+    References:
+        - An, J., & Owen, A. (2001). Quasi-regression. Journal of Complexity, 17(4), 588-607.
+    """
+
+    def function(Xs):
+        # Xs = Xs[:, [0, 4, 1, 5, 2, 6, 3, 7]]
+        u = np.sum(Xs[:, [1, 3, 5, 7]] * np.cos(np.cumsum(Xs[:, [0, 2, 4, 6]], axis=1)), axis=1)
+        v = np.sum(Xs[:, [1, 3, 5, 7]] * np.sin(np.cumsum(Xs[:, [0, 2, 4, 6]], axis=1)), axis=1)
+        # print(Xs.shape, u.shape)
+        return np.sqrt(u**2 + v**2)
+
+    axes = (('phi1', None, (0, 2 * np.pi), ('unif', None, None)),
+            ('L1', None, (0, 1), ('unif', None, None)),
+            ('phi2', None, (0, 2 * np.pi), ('unif', None, None)),
+            ('L2', None, (0, 1), ('unif', None, None)),
+            ('phi3', None, (0, 2 * np.pi), ('unif', None, None)),
+            ('L3', None, (0, 1), ('unif', None, None)),
+            ('phi4', None, (0, 2 * np.pi), ('unif', None, None)),
+            ('L4', None, (0, 1), ('unif', None, None)))
+
+    return function, axes
+
+
+def get_wing_weight():
+    """Weight of a wing (https://www.sfu.ca/~ssurjano/wingweight.html)
+
+    References:
+        - Forrester, A., Sobester, A., & Keane, A. (2008). Engineering design via
+            surrogate modelling: a practical guide. Wiley.
+        - Moon, H. (2010). Design and Analysis of Computer Experiments for
+            Screening Input Variables (Doctoral dissertation, Ohio State University).
+        - Moon, H., Dean, A. M., & Santner, T. J. (2012). Two-stage sensitivity-based
+            group screening in computer experiments. Technometrics, 54(4), 376-387.
+    """
+
+    def function(Xs):
+        Xs[:, 3] *= 2*np.pi/360  # Original bounds for 'Lambda" are in degrees
+        return 0.036 * Xs[:, 0]**0.758 * Xs[:, 1]**0.0035 * (Xs[:, 2] / np.cos(Xs[:, 3])**2)**0.6 * Xs[:, 4]**0.006 * Xs[:, 5]**0.04 * (100*Xs[:, 6] / np.cos(Xs[:, 3]))**-0.3 * (Xs[:, 7]*Xs[:, 8])**0.49 + Xs[:, 0]*Xs[:, 9]
+
+    axes = (('Sw', None, (150, 200), ('unif', None, None)),
+            ('Wfw', None, (220, 300), ('unif', None, None)),
+            ('A', None, (6, 10), ('unif', None, None)),
+            ('Lambda', None, (-10, 10), ('unif', None, None)),
+            ('q', None, (16, 45), ('unif', None, None)),
+            ('lambda', None, (0.5, 1), ('unif', None, None)),
+            ('tc', None, (0.08, 0.18), ('unif', None, None)),
+            ('Nz', None, (2.5, 6), ('unif', None, None)),
+            ('Wdg', None, (1700, 2500), ('unif', None, None)),
+            ('Wp', None, (0.025, 0.08), ('unif', None, None)))
+
+    return function, axes
+
+
+def get_otl_circuit():
+    """Midpoint voltage of a push-pull circuit (https://www.sfu.ca/~ssurjano/otlcircuit.html)
+    
+    References:
+        - Ben-Ari, E. N., & Steinberg, D. M. (2007). Modeling data from computer
+            experiments: an empirical comparison of kriging with MARS and projection pursuit regression. Quality Engineering, 19(4), 327-338.
+        - Moon, H. (2010). Design and Analysis of Computer Experiments for
+            Screening Input Variables (Doctoral dissertation, Ohio State University).
+        - Moon, H., Dean, A. M., & Santner, T. J. (2012). Two-stage sensitivity-based
+            group screening in computer experiments. Technometrics, 54(4), 376-387.
+    """
+
+    def function(Xs):
+        Vb1 = 12 * Xs[:, 1] / (Xs[:, 0] + Xs[:, 1])
+        part1 = (Vb1 + 0.74) * Xs[:, 5] * (Xs[:, 4] + 9) / (Xs[:, 5]*(Xs[:, 4]+9) + Xs[:, 2])
+        part2 = 11.35 * Xs[:, 2] / (Xs[:, 5]*(Xs[:, 4]+9)+Xs[:, 2])
+        part3 = 0.74 * Xs[:, 2] * Xs[:, 5] * (Xs[:, 4] + 9) / ((Xs[:, 5] * (Xs[:, 4] + 9) + Xs[:, 2]) * Xs[:, 3])
+        return part1 + part2 + part3
+
+    axes = (('Rb1', None, (50, 150), ('unif', None, None)),
+            ('Rb2', None, (25, 70), ('unif', None, None)),
+            ('Rf', None, (0.5, 3), ('unif', None, None)),
+            ('Rc1', None, (1.2, 2.5), ('unif', None, None)),
+            ('Rc2', None, (0.25, 1.2), ('unif', None, None)),
+            ('beta', None, (50, 300), ('unif', None, None)))
+
+    return function, axes
+
+
+def get_welch_1992():
+    """High-dimensional function designed for screening purposes (https://www.sfu.ca/~ssurjano/welchetal92.html)
+
+    References:
+        - Ben-Ari, E. N., & Steinberg, D. M. (2007). Modeling data from computer
+            experiments: an empirical comparison of kriging with MARS and
+            projection pursuit regression. Quality Engineering, 19(4), 327-338.
+        - Welch, W. J., Buck, R. J., Sacks, J., Wynn, H. P., Mitchell, T. J., & Morris, M. D. (1992).
+            Screening, predicting, and computer experiments. Technometrics, 34(1), 15-25.
+    """
+
+    def function(Xs):
+        return Xs[:, 11] / (1 + Xs[:, 0]) + 5*(Xs[:, 3] - Xs[:, 19])**2 + Xs[:, 4] + 40*Xs[:, 18]**3 - 5*Xs[:, 18] + 0.05*Xs[:, 1] + 0.08*Xs[:, 4] - 0.03*Xs[:, 5] + 0.03*Xs[:, 6] - 0.09*Xs[:, 8] - 0.01*Xs[:, 9] - 0.07*Xs[:, 10] + 0.25*Xs[:, 12]**2 - 0.04*Xs[:, 13] + 0.06*Xs[:, 14] - 0.01*Xs[:, 16] - 0.03*Xs[:, 17]
+
+    axes = make_unif_axes(20, bounds=(-0.5, 0.5))
+
+    return function, axes
+
+
+def get_dette_pepelyshev():
+    """Highly curved synthetic function (https://www.sfu.ca/~ssurjano/detpep10curv.html)
+
+    References:
+        - Dette, H., & Pepelyshev, A. (2010). Generalized Latin hypercube
+            design for computer experiments. Technometrics, 52(4).
+    """
+
+    def function(Xs):
+        return 4*(Xs[:, 0] - 2 + 8*Xs[:, 1] - 8*Xs[:, 1]**2)**2 + (3 - 4*Xs[:, 1])**2 + 16*np.sqrt(Xs[:, 2] + 1)*(2*Xs[:, 2] - 1)**2
+
+    axes = make_unif_axes(3, bounds=(0, 1))
+
+    return function, axes
+
+
+def get_environmental_model():
+    """6D model (4 input variables, output is 2D) modeling the concentration of a pollutant after an accidental spill (https://www.sfu.ca/~ssurjano/environ.html)
+
+    For the output dimensions, we use bounds (0, 3) (spatial axis) and (0.3, 60) (time axis)
+
+    References:
+        - Bliznyuk, N., Ruppert, D., Shoemaker, C., Regis, R., Wild, S., & Mugunthan, P. (2008).
+            Bayesian calibration and uncertainty analysis for computationally
+            expensive models using optimization and radial basis function approximation.
+            Journal of Computational and Graphical Statistics, 17(2).
+    """
+
+    def function(Xs):
+        result = Xs[:, 0] / np.sqrt(4*np.pi*Xs[:, 1]*Xs[:, 5]) * np.exp(-(Xs[:, 4]**2) / (4*Xs[:, 1]*Xs[:, 5]))
+        idx = (Xs[:, 5] > Xs[:, 3])
+        result[idx] += Xs[idx, 0] / np.sqrt(4*np.pi*Xs[idx, 1]*(Xs[idx, 5]-Xs[idx, 3])) * np.exp(-((Xs[idx, 4]-Xs[idx, 2])**2) / (4*Xs[idx, 1]*(Xs[idx, 5]-Xs[idx, 3])))
+        return np.sqrt(4*np.pi) * result
+
+    axes = (('M', None, (7, 13), ('unif', None, None)),
+            ('D', None, (0.02, 0.12), ('unif', None, None)),
+            ('L', None, (0.01, 3), ('unif', None, None)),
+            ('tau', None, (30.01, 30.295), ('unif', None, None)),
+            ('s', None, (0, 3), ('unif', None, None)),
+            ('t', None, (0.3, 60), ('unif', None, None)))
+
+    return function, axes
+
+
+def get_hilbert(N, size):
+
+    def function(Xs):
+        return 1./np.sum(Xs, axis=1)
+
+    axes = make_unif_axes(N, bounds=[1, size])
+
+    return function, axes
