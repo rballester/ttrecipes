@@ -10,6 +10,8 @@
 - Adaptive cross-approximation and element-wise functions
 - Mask tensors and TTs that behave similarly to deterministic finite automata
 
+A Jupyter Notebook with **sensibility analysis** examples is available on Microsoft Azure Notebooks (a free account is needed for running an interactive version): [![Azure Notebooks](https://notebooks.azure.com/launch.png)](https://notebooks.azure.com/egparedes/libraries/ttrecipes/html/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb)
+
 ## References
 
 - I. Oseledets. *Tensor-train decomposition* (2011)
