@@ -37,8 +37,8 @@ def main():
                         help="Maximum order of the collected indices "
                              "(default: {})".format(default_order))
 
-    print("*TT-recipes* example:", parser.description, "\n")
     args = parser.parse_args()
+    print("*TT recipes* example:", parser.description, "\n")
     if args.verbose:
         pprint.pprint(args)
 

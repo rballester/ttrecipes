@@ -45,8 +45,8 @@ def main():
                         help='Constant oefficient for Sobol G function '
                              '(default: {})'.format(default_acoeff))
 
-    print("*TT-recipes* example:", parser.description, "\n")
     args = parser.parse_args()
+    print("*TT recipes* example:", parser.description, "\n")
     if args.verbose:
         pprint.pprint(args)
 
