@@ -14,20 +14,12 @@ with open('README.md') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [
-    # TODO: put package requirements here
-]
-
-test_requirements = [
-    'nose',
-    # TODO: put package test requirements here
-]
-
 setup(
     name='ttrecipes',
     version='0.1.0',
     description="A cookbook of algorithms and tools that use the tensor train fomat",
     long_description=readme + '\n\n' + history,
+    url='https://github.com/rballester/ttrecipes',
     author="Rafael Ballester-Ripoll, Enrique G. Paredes",
     author_email='rballester@ifi.uzh.ch, egparedes@ifi.uzh.ch',
     packages=[
@@ -39,6 +31,7 @@ setup(
         'numpy',
         'scipy',
         'ttpy',
+        'tabulate'
     ],
     license="ISCL",
     zip_safe=False,
@@ -55,7 +48,8 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
     test_suite='tests',
-    tests_require=test_requirements
+    tests_require='nose'
 )

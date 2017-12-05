@@ -23,12 +23,10 @@ import ttrecipes as tr
 def main():
     default_bins = 100
     default_order = 2
-    default_products = 10
-    default_years = 2.0
 
     parser = argparse.ArgumentParser(
-        description="Perform sensitivity analysis of a decay chain of species"
-                    " with different decay rates")
+        description="Perform sensitivity analysis of a chain of nonlinear functions"
+                    " simulating the circular motion of a piston within a cylinder.")
     parser.add_argument('--seed', type=int,
                         help="Random seed (default: not set)")
     parser.add_argument('--verbose', action='store_true',
@@ -39,12 +37,6 @@ def main():
     parser.add_argument('--order', default=default_order, type=int,
                         help="Maximum order of the collected indices "
                              "(default: {})".format(default_order))
-    parser.add_argument('--products', default=default_products, type=int,
-                        help='Number of decaying products in the chain '
-                             '(default: {})'.format(default_products))
-    parser.add_argument('--years', default=default_years, type=float,
-                        help='Simulated years of decay time '
-                             '(default: {})'.format(default_years))
 
     args = parser.parse_args()
     print("*TT recipes* example:", parser.description, "\n")
@@ -55,15 +47,13 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
 
-    f, axes = tr.models.get_decay_poisson(
-        d=args.products, span=args.years, hl_range=(3.0 * (1 / 12.0), 3.0),
-        time_step=1.0 / 365.0, name_tmpl='lambda_{:0>2}')
+    f, axes = tr.models.get_piston()
     if args.verbose:
         pprint.pprint(axes)
 
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
     results = tr.sensitivity_analysis.var_metrics(
-        f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-4,
+        f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-5,
         max_order=args.order, cross_kwargs=dict(), print_results=True)
 
 
