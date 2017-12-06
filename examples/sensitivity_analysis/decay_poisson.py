@@ -62,9 +62,9 @@ def main():
         pprint.pprint(axes)
 
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
-    results = tr.sensitivity_analysis.var_metrics(
+    metrics, stt_info = tr.sensitivity_analysis.compute_var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-4,
-        max_order=args.order, cross_kwargs=dict(), print_results=True)
+        cross_kwargs=dict(), max_order=args.order, show=True)
 
 
 if __name__ == "__main__":

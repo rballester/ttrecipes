@@ -9,13 +9,13 @@ cd ${install_dir}
 if [ ! -d ${install_dir}/ttrecipes ]; then
     git clone -b ${repo_branch} ${repo_url}
 else
-    git fetch && git checkout ${repo_branch} && git checkout . && git pull
+    git checkout . && git pull
 fi
 
-echo "Installing Python 3 packages..."
-pip3 install --user six numpy cython
-pip3 install --user -r requirements.txt
+#echo "Installing Python 3 packages..."
+#pip3 install --user six numpy cython
+#pip3 install --user -r requirements.txt
 
-#pip3 install --user six cython
-#pip3 install --user git+https://github.com/oseledets/ttpy@4e4cf970fad9a4ad39efcab3d009326a71113a49#egg=ttpy
-#pip3 install --user -e .
+#echo "Installing Python 2 packages..."
+#pip2 install --user six numpy cython
+#pip2 install --user -r requirements.txt
