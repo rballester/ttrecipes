@@ -9,7 +9,7 @@ cd ${install_dir}
 if [ ! -d ${install_dir}/ttrecipes ]; then
     git clone -b ${repo_branch} ${repo_url}
 else
-    git checkout . && git pull
+    git checkout examples/sensitivity_analysis && git pull &
 fi
 
 #echo "Installing Python 3 packages..."
@@ -19,3 +19,4 @@ fi
 #echo "Installing Python 2 packages..."
 #pip2 install --user six numpy cython
 #pip2 install --user -r requirements.txt
+
