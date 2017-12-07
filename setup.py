@@ -33,7 +33,7 @@ setup(
         'ttpy',
         'tabulate'
     ],
-    license="ISCL",
+    license="LGPL",
     zip_safe=False,
     keywords='ttrecipes',
     classifiers=[

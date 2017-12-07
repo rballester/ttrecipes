@@ -19,8 +19,8 @@ from __future__ import (absolute_import, division, print_function,
 
 import collections
 import functools
-
 import numpy as np
+import scipy as sp
 
 
 def make_unif_axes(n, bounds=(0.0, 1.0), name_tmpl='x{}'):
@@ -302,8 +302,8 @@ def get_piston():
             ('V_0', None, (0.002, 0.010), ('unif', None, None)),
             ('k', None, (1000, 5000), ('unif', None, None)),
             ('P_0', None, (90000, 110000), ('unif', None, None)),
-            ('T_a', None, (290, 296), ('unif', 290, 296)),
-            ('T_$', None, (340, 360), ('unif', None, None)))
+            ('T_a', None, (290, 296), ('unif', None, None)),
+            ('T_0', None, (340, 360), ('unif', None, None)))
 
     return function, axes
 

@@ -30,15 +30,22 @@ import numpy as np
 import scipy as sp
 import scipy.stats
 from tabulate import tabulate
+try:
+    import matplotlib
+    import matplotlib.pyplot as plt
+except ImportError:
+    TTRECIPES_PLOT_FUNCTIONS_ENABLED = False
+else:
+    TTRECIPES_PLOT_FUNCTIONS_ENABLED = True
 
 import tt
-import ttrecipes as ttr
+import ttrecipes as tr
 
 
-def compute_var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
-                        sampling_mode='spatial', dist_fraction=0.00005,
-                        eps=1e-5, verbose=False, cross_kwargs=None,
-                        max_order=2, show=False):
+def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
+                sampling_mode='spatial', dist_fraction=0.00005,
+                eps=1e-5, verbose=False, cross_kwargs=None,
+                max_order=2, show=False):
     """Variance-based sensitivity analysis.
 
     User-friendly wrapper that conducts a general variance-based sensitivity
@@ -89,11 +96,10 @@ def compute_var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
         show (bool, optional): Print results. Defaults to False.
 
     Returns:
-        tuple(dict, dict): A tuple of dictionaries 'metrics', 'stt_info'.
-            The first one contains a structured and easily accessible collection
-            of sensitivity metrics. The second one contains the actual Sobol
-            Tensor Trains encoding all the posible metrics and additional
-            metainformation for internal use of TT recipes routines.
+        tuple(dict, dict): A 'metrics' dictionary containing a structured and
+            easily accessible collection of sensitivity metrics, and additional
+            metainfomation with the actual Sobol Tensor Trains (for internal use
+            of TT recipes routines).
 
             {
                 'variables': ``list`` with the names of the model variables
@@ -121,7 +127,7 @@ def compute_var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
                     ('m_l', 150, (0.0, None), ('norm', 1.18, 0.377)),
                     ('k', None, (1000, 5000), ('unif', None, None)))
 
-            metrics, stt_info = sensitivity_analysis.compute_var_metrics(
+            metrics = sensitivity_analysis.var_metrics(
                 my_function, axes, eps=1e-3, verbose=True)
             print_metrics(metrics)
 
@@ -265,45 +271,45 @@ def compute_var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
     pdf = tt.vector.from_list([marg[np.newaxis, :, np.newaxis] for marg in marginals])
 
     def f_premultiplied(Xs):
-        return f(Xs) * ttr.core.sparse_reco(pdf, ttr.core.coordinates_to_indices(Xs, ticks_list=ticks_list))
+        return f(Xs) * tr.core.sparse_reco(pdf, tr.core.coordinates_to_indices(Xs, ticks_list=ticks_list))
 
-    tt_pdf = ttr.core.cross(ticks_list, f_premultiplied, mode=mode, eps=eps,
+    tt_pdf = tr.core.cross(ticks_list, f_premultiplied, mode=mode, eps=eps,
                             verbose=verbose, **cross_kwargs)
     model_time = time.time() - model_time
 
     if verbose:
         print("\n-> Computing sensitivity metrics")
     sa_time = time.time()
-    st = ttr.core.sobol_tt(tt_pdf, pdf=pdf, premultiplied=True, eps=eps,
-                           verbose=verbose, **cross_kwargs)
+    st = tr.core.sobol_tt(tt_pdf, pdf=pdf, premultiplied=True, eps=eps,
+                          verbose=verbose, **cross_kwargs)
 
-    tst = ttr.core.to_upper(st)
-    cst = ttr.core.to_lower(st)
-    sst = ttr.core.to_superset(st)
-    dim, var = ttr.core.effective_dimension(st, effective_threshold, 'truncation')
-    indices, _ = ttr.core.largest_k_tuple(cst, dim)
-    shapley_values = ttr.core.semivalues(cst, ps='shapley')
-    banzhaf_coleman_values = ttr.core.semivalues(cst, ps='banzhaf-coleman')
+    tst = tr.core.to_upper(st)
+    cst = tr.core.to_lower(st)
+    sst = tr.core.to_superset(st)
+    dim, var = tr.core.effective_dimension(st, effective_threshold, 'truncation')
+    indices, _ = tr.core.largest_k_tuple(cst, dim)
+    shapley_values = tr.core.semivalues(cst, ps='shapley')
+    banzhaf_coleman_values = tr.core.semivalues(cst, ps='banzhaf-coleman')
 
     metrics = dict()
     metrics['variables'] = names
-    metrics['dimension_distribution'] = ttr.core.sensitivity.dimension_distribution(st)
+    metrics['dimension_distribution'] = tr.core.sensitivity.dimension_distribution(st)
     metrics['mean_dimension'] = metrics['dimension_distribution'].dot(np.arange(1, N + 1))
-    metrics['effective_superposition'] = ttr.core.effective_dimension(
+    metrics['effective_superposition'] = tr.core.effective_dimension(
         st, effective_threshold, 'superposition')
     metrics['effective_truncation'] = (dim, var, indices)
-    metrics['effective_successive'] = ttr.core.effective_dimension(
+    metrics['effective_successive'] = tr.core.effective_dimension(
         st, effective_threshold, 'successive')
+    metrics['effective_threshold'] = effective_threshold
     sa_time = time.time() - sa_time
 
     if verbose:
         print("\n-> Exporting results")
 
-    stt_info = dict(
-        _tr_info=('stt'),
+    metrics['_tr_info'] = dict(
+        tags=('stt'),
         axes=axes,
         default_bins=default_bins,
-        effective_threshold=effective_threshold,
         eps=eps,
         verbose=verbose,
         cross_kwargs=cross_kwargs,
@@ -317,75 +323,85 @@ def compute_var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
         cst=cst,
         sst=sst
     )
-    metrics.update(collect_var_indices(stt_info, max_order))
 
     metrics['shapley_values'] = dict()
     metrics['banzhaf_coleman_values'] = dict()
     for i, name in enumerate(names):
         metrics['shapley_values'][name] = shapley_values[i]
         metrics['banzhaf_coleman_values'][name] = banzhaf_coleman_values[i]
+    collect_sobol(metrics, max_order)
     # pprint.pprint(metrics)
-    # pprint.pprint(stt_info)
-
     if show:
-        print_metrics(metrics)
-
-    return metrics, stt_info
-
-
-def collect_var_indices(stt_info, max_order):
-    """Collect Sobol sensitivity indices up to a maximum order from a Sobol Tensor Train.
-
-    Args:
-        stt_info (dict): Sobol Tensor Train metainformation
-            (typically obtained from: _, stt_info = compute_var_metrics(...))
-        max_order (int): Maximum order of the collected Sobol indices.
-
-    Returns:
-        dict: A dictionary with a structured and easily accessible collection
-            of sensitivity metrics.
-
-    """
-    assert('stt' in stt_info['_tr_info'])
-    assert(max_order > 0)
-
-    axes = stt_info['axes']
-    N = len(axes)
-    names = [axis[0] for axis in axes]
-    st = stt_info['st']
-    tst = stt_info['tst']
-    cst = stt_info['cst']
-    sst = stt_info['sst']
-
-    metrics = dict(sobol_indices=dict(), total_sobol_indices=dict(),
-                   closed_sobol_indices=dict(), superset_sobol_indices=dict())
-    for order in range(1, max_order + 1):
-        metrics['sobol_indices'][order] = dict()
-        metrics['total_sobol_indices'][order] = dict()
-        metrics['closed_sobol_indices'][order] = dict()
-        metrics['superset_sobol_indices'][order] = dict()
-
-        for idx in itertools.combinations(list(range(N)), order):
-            key = tuple(names[i] for i in idx)
-            metrics['sobol_indices'][order][key] = ttr.core.set_choose(st, idx)
-            metrics['total_sobol_indices'][order][key] = ttr.core.set_choose(tst, idx)
-            metrics['closed_sobol_indices'][order][key] = ttr.core.set_choose(cst, idx)
-            metrics['superset_sobol_indices'][order][key] = ttr.core.set_choose(sst, idx)
+        print(tabulate_metrics(metrics, max_order))
 
     return metrics
 
 
-def print_metrics(metrics, tablefmt="presto", floatfmt=".6f",
-                  numalign="decimal", stralign="left"):
-    """Print tables with the contents of the collected sensitivity metrics.
+def collect_sobol(metrics, max_order):
+    """Collect Sobol sensitivity indices up to a maximum order from a Sobol Tensor Train.
+
+    Args:
+        metrics (dict): Sobol Tensor Train metainformation
+            (typically obtained from: metrics = var_metrics(...))
+        max_order (int): Maximum order of the collected Sobol indices.
+
+    Returns:
+        dict: A dictionary with a structured and easily accessible collection
+            of Sobol indices.
+
+    """
+    if (not isinstance(metrics, dict) or '_tr_info' not in metrics or
+            'stt' not in metrics['_tr_info']['tags']):
+        raise ValueError("Invalid 'metrics' object")
+    if max_order < 1:
+        raise ValueError("'max_order' must be larger than zero")
+
+    axes = metrics['_tr_info']['axes']
+    N = len(axes)
+    names = [axis[0] for axis in axes]
+    st = metrics['_tr_info']['st']
+    tst = metrics['_tr_info']['tst']
+    cst = metrics['_tr_info']['cst']
+    sst = metrics['_tr_info']['sst']
+
+    collected = dict(sobol_indices=dict(), total_sobol_indices=dict(),
+                     closed_sobol_indices=dict(), superset_sobol_indices=dict())
+    for order in range(1, max_order + 1):
+        collected['sobol_indices'][order] = dict()
+        collected['total_sobol_indices'][order] = dict()
+        collected['closed_sobol_indices'][order] = dict()
+        collected['superset_sobol_indices'][order] = dict()
+
+        for idx in itertools.combinations(list(range(N)), order):
+            key = tuple(names[i] for i in idx)
+            collected['sobol_indices'][order][key] = tr.core.set_choose(st, idx)
+            collected['total_sobol_indices'][order][key] = tr.core.set_choose(tst, idx)
+            collected['closed_sobol_indices'][order][key] = tr.core.set_choose(cst, idx)
+            collected['superset_sobol_indices'][order][key] = tr.core.set_choose(sst, idx)
+
+    metrics.update(collected)
+
+    return metrics
+
+
+def tabulate_metrics(metrics, max_order=None,
+                     selection=('indices', 'interactions', 'dimensions', 'dim_dist'),
+                     tablefmt="presto", floatfmt=".6f",
+                     numalign="decimal", stralign="left",
+                     output_mode='string', show_titles=True):
+    """Create tables with the contents of the collected sensitivity metrics.
 
     The tables are generated using 'tabulate'. It is possible to customize the
-    output by passing optional arguments with specific tabulate format
-    parameters.
+    output by passing optional arguments with specific tabulate format parameters.
 
     Args:
         metrics (dict): Collected sensitivity metrics
-            (typically obtained from: metrics, _ = compute_var_metrics(...))
+            (typically obtained from: metrics, _ = var_metrics(...))
+        max_order (int, optional): Maximum order of the collected Sobol indices.
+            If None (default), use the current value in 'metrics'.
+        selection (iterable, optional): Tables to be generated.
+            The options are: 'indices', 'interactions', 'dimensions', 'dim_dist'.
+            Defaults to ('indices', 'interactions', 'dimensions', 'dim_dist').
         tablefmt (str, optional): tabulate format parameter.
             Defaults to 'presto'.
         floatfmt (str, optional): tabulate format parameter.
@@ -394,48 +410,342 @@ def print_metrics(metrics, tablefmt="presto", floatfmt=".6f",
             Defaults to 'decimal'.
         stralign (str, optional): tabulate format parameter.
             Defaults to 'left'.
+        output_mode (str, optional): Output mode: 'string' (best for printing) or
+            'collection' (best for exporting). Defaults to 'string'.
+        show_titles (bool, optional): Add single line titles to the tables.
+            Defaults to True.
 
     """
+    for i in selection:
+        if i not in ('indices', 'interactions', 'dimensions', 'dim_dist'):
+            raise ValueError("selection items must be 'indices', 'interactions', "
+                             "'dimensions' or 'dim_dist'")
+
+    if max_order is None:
+        max_order = max(metrics['sobol_indices'].keys())
+    elif max(metrics['sobol_indices'].keys()) < max_order:
+        collect_sobol(metrics, max_order)
+
+    names = metrics['variables']
+    outputs = dict()
     tab_fn = functools.partial(tabulate, tablefmt=tablefmt, floatfmt=floatfmt,
                                numalign=numalign, stralign=stralign)
 
-    max_order = max(metrics['sobol_indices'].keys())
+    if 'indices' in selection:
+        out = []
+        table = [(n, metrics['sobol_indices'][1][(n,)],
+                  metrics['total_sobol_indices'][1][(n,)],
+                  metrics['shapley_values'][n],
+                  metrics['banzhaf_coleman_values'][n])
+                 for n in names]
+
+        if show_titles:
+            out.append("\n\t\t ** Sensitivity Indices **".upper())
+        out.append(tab_fn(table, headers=["Variable", "Sobol", "Total",
+                                          "Shapley", "Banzhaf-Coleman"]))
+        out.append('\n')
+        outputs['indices'] = '\n'.join(out)
+
+    if 'interactions' in selection:
+        for order in range(2, max_order + 1):
+            out = []
+            table = []
+            for key in metrics['sobol_indices'][order].keys():
+                table.append((*key, metrics['sobol_indices'][order][key],
+                              metrics['total_sobol_indices'][order][key],
+                              metrics['closed_sobol_indices'][order][key],
+                              metrics['superset_sobol_indices'][order][key]))
+
+            if show_titles:
+                out.append("\t\t ** Sensitivity Indices (order {}) **".format(order).upper())
+            out.append(tab_fn(table, headers=[*["Variable {}".format(i+1) for i in range(order)],
+                                                "Sobol", "Total", "Closed", "Superset"]))
+            out.append('\n')
+            outputs['interactions_{}'.format(order)] = '\n'.join(out)
+
+    if 'dimensions' in selection:
+        out = []
+        table = [('Mean dimension', metrics['mean_dimension']),
+                 ('Effective (superposition)', *metrics['effective_superposition']),
+                 ('Effective (successive)', *metrics['effective_successive']),
+                 ('Effective (truncation)', metrics['effective_truncation'][0],
+                  metrics['effective_truncation'][1], ", ".join(
+                      [names[i] for i in metrics['effective_truncation'][2]]))]
+
+        if show_titles:
+            out.append(("\t\t ** Dimension metrics **".upper()))
+        out.append(tab_fn(table, headers=["Dimension Metric", "Value",
+                                          "Rel. Variance", "Variables"]))
+        out.append('\n')
+        outputs['dimensions'] = '\n'.join(out)
+
+    if 'dim_dist' in selection:
+        out = []
+        cumul_dist = np.cumsum(metrics['dimension_distribution'])
+        table = [[i + 1, value, cumul_dist[i]]
+                 for i, value in enumerate(metrics['dimension_distribution'])]
+
+        if show_titles:
+            out.append("\t ** Dimension distribution **".upper())
+        out.append(tab_fn(table, headers=["Order", "Rel. Variance",
+                                          "Cumul. Variance"]))
+        out.append("\n")
+        outputs['dim_dist'] = '\n'.join(out)
+
+    if output_mode == 'string':
+        outputs = ''.join(outputs.values())
+
+    return outputs
+
+
+def query_sobol(STT, include=(), exclude=(), min_order=1, max_order=None,
+                mode='highest', index_type='standard',
+                eps=1e-6, verbose=False, **kwargs):
+    """Interface to query sensitivity metrics: find a tuple of variables satisfying certain criteria.
+
+    Args:
+        STT (object): A Sobol Tensor Train object from ttpy or a 'metrics' dictionary,
+            typically obtained from: metrics = var_metrics(...))
+        include (list): List of variables that must appear in the result.
+            When STT is a ttpy vector, it has to be a list of integers with the
+            indices of the variables. When STT is a 'metrics' dictionary, it may
+            also be a list of strings with the names of the variables.
+        exclude (list): List of variables that must NOT appear in the result.
+            When STT is a ttpy vector, it has to be a list of integers with the
+            indices of the variables. When STT is a 'metrics' dictionary, it may
+            also be a list of strings with the names of the variables.
+        min_order (int, optional): consider only tuples of this order or above.
+            Defaults to 1
+        max_order (int, optional): consider only tuples up to this order.
+            If None (default), no bound
+        mode (str, optional): must be 'highest' or 'lowest'.
+            Defaults to 'highest'.
+        index_type (str, optional): which Sobol indices or related indices to consider.
+            Must be 'standard', 'closed', 'total' or 'superset'. Defaults to 'standard'.
+        eps (float, optional): Tolerated relative error. Defaults to 1e-6.
+        verbose (bool, optional: Activate verbose mode. Defaults to False.
+
+    Returns:
+        (tuple, value): the best variables, and their index
+
+    """
+    if isinstance(STT, tt.core.vector.vector):
+        st = STT
+        names = None
+    elif isinstance(STT, dict) and '_tr_info' in STT and 'stt' in STT['_tr_info']['tags']:
+        st = STT['_tr_info']['st']
+        names = [axis[0] for axis in STT['_tr_info']['axes']]
+        names_idx = dict([(name, i) for i, name in enumerate(names)])
+        include = [i if isinstance(i, int) else names_idx[i] for i in include]
+        exclude = [i if isinstance(i, int) else names_idx[i] for i in exclude]
+    else:
+        raise ValueError("'STT' must be a ttpy vector or a 'metrics' object")
+
+    N = st.d
+    if max_order is None:
+        max_order = N
+    if index_type == 'closed':
+        st = tr.core.to_lower(st)
+    elif index_type == 'total':
+        st = tr.core.to_upper(st)
+    elif index_type == 'superset':
+        st = tr.core.to_superset(st)
+    elif index_type != 'standard':
+        raise ValueError("index_type must be 'standard', 'closed', 'total' or 'superset'")
+
+    # First mask: tuples that must be included
+    mask1 = [np.array([1, 1])[np.newaxis, :, np.newaxis] for n in range(N)]
+    for n in include:
+        mask1[n] = np.array([0, 1])[np.newaxis, :, np.newaxis]
+    mask1 = tt.vector.from_list(mask1)
+
+    # Second mask: tuples that must be excluded
+    mask2 = [np.array([1, 1])[np.newaxis, :, np.newaxis] for n in range(N)]
+    for n in exclude:
+        mask2[n] = np.array([1, 0])[np.newaxis, :, np.newaxis]
+    mask2 = tt.vector.from_list(mask2)
+
+    # Last mask: order bounds
+    hws = tr.core.hamming_weight_state(N)
+    cores = tt.vector.to_list(hws)
+    cores[-1][:, :min_order, :] = 0
+    cores[-1][:, max_order+1:, :] = 0
+    cores[-1] = np.sum(cores[-1], axis=1, keepdims=True)
+    mask3 = tr.core.squeeze(tt.vector.from_list(cores))
+    mask3 = tt.vector.round(mask3, eps=0)
+
+    if mode == 'highest':
+        st = tt.multifuncrs2([st, mask3], lambda x: x[:, 0] * x[:, 1],
+                             eps=eps, verb=verbose, **kwargs) * mask1 * mask2
+        val, point = tr.core.maximize(st)
+    elif mode == 'lowest':  # Shift down by one so that the masks' zeroing-out works as intended
+        st = tt.multifuncrs2([st - tr.core.constant_tt(st.n), mask3], lambda x: x[:, 0] * x[:, 1],
+                             eps=eps, verb=verbose, **kwargs) * mask1 * mask2
+        val, point = tr.core.minimize(st)
+        val += 1  # Shift the value back up
+    else:
+        raise ValueError("Mode must be either 'highest' or 'lowest'")
+
+    result = list(np.where(point)[0]), val
+    if names is not None:
+        result = ([names[i] for i in result[0]], val)
+    return result
+
+
+def plot_indices(metrics, indices=('sobol', 'shapley', 'total'),
+                 title='Sensitivity Indices', labels=('Variables', 'Variance'),
+                 fontsize=10.0, show=True):
+    """Plot selected sensitivity indices (requires Matplotlib).
+
+    Args:
+        metrics (dict): Collected sensitivity metrics
+            (typically obtained from: metrics, _ = var_metrics(...))
+        indices (iterable, optional): Ordered selection of sensitivity indices.
+            The options are: 'sobol', 'shapley', 'total'.
+            Defaults to ('sobol', 'shapley', 'total').
+        title (str, optional): Plot title. Defaults to 'Sensitivity Indices'.
+        labels ((str, str), optional): Labels for X and Y axes.
+            Defaults to ('Variables', 'Variance').
+        fontsize (float, optional): Font size for text labels. Defaults to 10.0
+        show (bool, optional): Force inmediate plot of the results.
+            Defaults to True.
+
+    Returns:
+        ax, fig: Tuple of 'axis' and 'figure' Matplotlib objects.
+
+    """
+    if not TTRECIPES_PLOT_FUNCTIONS_ENABLED:
+        print("Matplotlib not found: plotting functions are disabled")
+        return None, None
+
     names = metrics['variables']
-    table = [(n, metrics['sobol_indices'][1][(n,)],
-              metrics['total_sobol_indices'][1][(n,)],
-              metrics['shapley_values'][n],
-              metrics['banzhaf_coleman_values'][n])
-             for n in names]
-    print("\n\n\t\t -- Sensitivity Indices --".upper())
-    print(tab_fn(table, headers=["Variable", "Sobol", "Total", "Shapley",
-                                 "Banzhaf-Coleman"]))
+    n_vars = len(names)
+    colors = dict(sobol='#9FC1D3',
+                  shapley='#276090',
+                  total='#A5CD82')
+    values = dict(sobol=[metrics['sobol_indices'][1][name,] for name in names],
+                  shapley=[metrics['shapley_values'][name] for name in names],
+                  total=[metrics['total_sobol_indices'][1][name,] for name in names])
+    bar_spacer = 0.2
+    bar_width = (1 - bar_spacer) / len(indices)
 
-    for order in range(2, max_order + 1):
-        table = []
-        for key in metrics['sobol_indices'][order].keys():
-            table.append((*key, metrics['sobol_indices'][order][key],
-                          metrics['total_sobol_indices'][order][key],
-                          metrics['closed_sobol_indices'][order][key],
-                          metrics['superset_sobol_indices'][order][key]))
+    fig, ax = plt.subplots()
+    ax.set_title(title)
+    ax.set_ylim(0, 1.09)
+    ax.set_xlabel(labels[0], fontsize=fontsize)
+    ax.set_ylabel(labels[1])
+    ax.set_xticks(0.5 + np.arange(n_vars))
+    ax.set_xticklabels(names)
 
-        print("\n\n\t\t -- Sensitivity Indices (order {}) --".format(order).upper())
-        print(tab_fn(table, headers=[*["Variable {}".format(i+1) for i in range(order)],
-                                     "Sobol", "Total", "Closed", "Superset"]))
+    for i, index in enumerate(indices):
+        if index not in ('sobol', 'shapley', 'total'):
+            raise ValueError("mark must be 'sobol', 'shapley' or 'total'")
+        bars = ax.bar(bar_spacer + i * bar_width + np.arange(n_vars), values[index],
+                      bar_width, color=colors[index])
+        bars.set_label(index)
+    ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", ncol=1)
 
-    table = [('Mean dimension', metrics['mean_dimension']),
-             ('Effective (superposition)', *metrics['effective_superposition']),
-             ('Effective (successive)', *metrics['effective_successive']),
-             ('Effective (truncation)', metrics['effective_truncation'][0],
-              metrics['effective_truncation'][1], ", ".join(
-                  [names[i] for i in metrics['effective_truncation'][2]]))]
+    if show:
+        plt.show()
 
-    print(("\n\n\t\t -- Dimension metrics --".upper()))
-    print(tab_fn(table, headers=["Dimension Metric", "Value", "Rel. Variance",
-                                 "Variables"]))
+    return fig, ax
 
-    cumul_dist = np.cumsum(metrics['dimension_distribution'])
-    table = [[i + 1, value, cumul_dist[i]]
-             for i, value in enumerate(metrics['dimension_distribution'])]
-    print("\n\n\t -- Dimension distribution --".upper())
-    print(tab_fn(table, headers=["Order", "Rel. Variance", "Cumul. Variance"]))
-    print("\n")
+
+def plot_dim_distribution(metrics, marks=('cumulative', 'mean', 'superposition'),
+                          title='Dimension distribution', labels=('', 'Variance'),
+                          max_order=None, annotate=True, float_fmt='{:.2f}',
+                          fontsize=10.0, show=True):
+    """Plot selected sensitivity indices (requires Matplotlib).
+
+    Args:
+        metrics (dict): Collected sensitivity metrics
+            (typically obtained from: metrics, _ = var_metrics(...))
+        marks (iterable, optional): Selection of dimension metrics.
+            The options are: 'cumulative', 'mean', 'superposition'.
+            Defaults to ('cumulative', 'mean', 'superposition').
+        title (str, optional): Plot title. Defaults to 'Dimension distribution'.
+        labels ((str, str), optional): Labels for X and Y axes.
+            Defaults to ('', 'Variance').
+        max_order (int, optional): Maximum order shown in the plot.
+            Defaults to None
+        annotate (bool, optional): Add labels with the exact values.
+            Defaults to True.
+        float_fmt (str, optional): format specification string for float values.
+            Defaults to '{:.2f}'.
+        fontsize (float, optional): Font size for text labels. Defaults to 10.0
+        show (bool, optional): Force inmediate plot of the results.
+            Defaults to True.
+
+    Returns:
+        ax, fig: Tuple of 'axis' and 'figure' Matplotlib objects.
+
+    """
+
+    if not TTRECIPES_PLOT_FUNCTIONS_ENABLED:
+        print("Matplotlib not found: plotting functions are disabled")
+        return None, None
+
+    dims_dist = metrics['dimension_distribution'][:max_order]
+    cumul_dist = np.cumsum(dims_dist)
+    d_length = len(dims_dist)
+    orders = np.arange(1, d_length + 1)
+
+    colors = dict(dist='#5D4470', cumul='#1B61A5',
+                  mean='#469B55', superposition='#6C6C6C')
+    width = 0.8
+    x_offset = -fontsize * d_length / 400.0
+    y_offset = 0.0025 * fontsize
+
+    fig, ax = plt.subplots()
+    ax.set_title(title)
+    ax.set_ylim(0, 1.09)
+    ax.set_xlim(0.5, d_length + 0.5)
+    ax.set_xlabel(labels[0], fontsize=fontsize)
+    ax.set_ylabel(labels[1])
+
+    ax.bar(orders, dims_dist, width, color=colors['dist'])
+    if annotate:
+        for i, value in enumerate(dims_dist):
+            if value > 2.5 * y_offset:
+                y = value - 2 * y_offset
+                color = 'w'
+            else:
+                y = value + y_offset
+                color = 'k'
+            ax.text(x_offset + i + 1, y, float_fmt.format(value),
+                    color=color, fontsize=fontsize)
+
+    if 'cumulative' in marks:
+        ax.plot(orders, cumul_dist, colors['cumul'])
+        ax.scatter(orders, cumul_dist, c=colors['cumul'], marker='s', zorder=3)
+        if annotate:
+            for i, value in enumerate(cumul_dist):
+                if i > 0:
+                    ax.text(x_offset + i + 1, y_offset + cumul_dist[i],
+                            float_fmt.format(value), color=colors['cumul'],
+                            fontsize=fontsize)
+
+    if 'mean' in marks:
+        mean_d = metrics['mean_dimension']
+        ax.axvline(mean_d, c=colors['mean'], linestyle='-', zorder=1)
+        if annotate:
+            ax.text( mean_d, 0.5,
+                    (' $D_S=' + float_fmt + '$').format(mean_d).format(mean_d),
+                    color=colors['mean'], fontsize=fontsize)
+
+    if 'superposition' in marks:
+        super_d, super_d_var = metrics['effective_superposition']
+        threshold = metrics['effective_threshold']
+        ax.axvline(super_d, c=colors['superposition'], linestyle='--', zorder=0)
+        ax.axhline(threshold, c=colors['superposition'], linestyle=':', zorder=0)
+        if annotate:
+            ax.text(super_d, 0.25, ' $d_S={}$'.format(super_d),
+                    color=colors['superposition'], fontsize=fontsize)
+            ax.text(d_length + 0.6 * width, threshold,
+                    ('1-$\epsilon=' + float_fmt + '$').format(threshold),
+                    color=colors['superposition'], fontsize=0.8 * fontsize)
+
+    if show:
+        plt.show()
+
+    return fig, ax
