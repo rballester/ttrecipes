@@ -138,7 +138,7 @@ def get_sobol_g(N, a=6.52, name_tmpl='x_{}'):
     return function, axes
 
 
-def get_prod(N, constant=1, name_tmpl='x_{}'):
+def get_prod(N, k=1, name_tmpl='x_{}'):
     """Analytical test function used for sensitivity analysis.
 
     References:
@@ -150,11 +150,11 @@ def get_prod(N, constant=1, name_tmpl='x_{}'):
 
     assert N > 0
 
-    def function(Xs, constant=constant):
+    def function(Xs, k=k):
 
         Xs = np.asarray(Xs)
         assert(Xs.shape[1] == N)
-        return np.prod(np.abs(constant * Xs - 2), axis=1)
+        return np.prod(np.abs(k * Xs - 2), axis=1)
 
     axes = [dict(name=name_tmpl.format(n)) for n in range(N)]
 

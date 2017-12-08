@@ -115,15 +115,16 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
             }
 
     Examples:
-        Call the function using long declarative format::
+        Call the function with a user-defined function::
 
             from ttrecipes import sensitivity_analysis
 
-            axes = (('M', None, (30, 60), ('unif', None, None)),
-                    ('S', 0.5, (0.005, 0.020), ('unif', None, None)),
-                    ('rho_p', None, None, ('lognorm', -0.592, 0.219)),
-                    ('m_l', 150, (0.0, None), ('norm', 1.18, 0.377)),
-                    ('k', None, (1000, 5000), ('unif', None, None)))
+            axes = [dict(name='Q', domain=(500, 3000), dist=sp.stats.gumbel_r(1013.0, 558.0)),
+                    dict(name='K_s', domain=(15.0, None), dist=sp.stats.norm(loc=30, scale=8)),
+                    dict(name='Z_m', dist=sp.stats.triang(loc=54.0, scale=2, c=0.5)),
+                    dict(name='H_d', dist=sp.stats.uniform(loc=7, scale=2)),
+                    dict(name='B', dist=sp.stats.triang(loc=295.0, scale=10, c=0.5)),
+                    dict(name='delta', dist=sp.stats.lognorm(scale=np.exp(2.19), s=0.517))]
 
             metrics = sensitivity_analysis.var_metrics(
                 my_function, axes, eps=1e-3, verbose=True)
@@ -152,49 +153,50 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
     for i, axis in enumerate(axes):
         names[i] = axis.get('name', 'x_{}'.format(i))
         bounds = None
-        domain = None
+        samples = None
 
-        if 'domain' in axis:
-            if len(axis['domain']) == 2 and not isinstance(axis['domain'], np.ndarray):
-                bounds = list(axis['domain'])
+        domain = axis.get('domain', None)
+        if domain is not None:
+            if len(domain) == 2 and not isinstance(domain, np.ndarray):
+                bounds = list(domain)
             else:
-                domain = np.asarray(axis['domain'])
+                samples = np.asarray(domain)
 
-        if 'dist' in axis:
-            dist = axis['dist']
+        dist = axis.get('dist', None)
+        if dist is not None:
             if bounds is None:
                 bounds = [None, None]
-        elif domain is not None:
-            dist = np.ones(domain.shape)
+        elif samples is not None:
+            dist = np.ones(samples.shape)
         elif bounds is not None:
             dist = sp.stats.uniform(loc=bounds[0], scale=bounds[1] - bounds[0])
         else:
             dist = sp.stats.uniform(loc=0, scale=1)
             bounds = [0., 1.]
 
-        assert dist is not None and (bounds is not None or domain is not None)
+        assert dist is not None and (bounds is not None or samples is not None)
 
         if isinstance(dist, scipy.stats.distributions.rv_frozen):
-            if domain is None:
+            if samples is None:
                 if bounds[0] is None:
                     bounds[0] = dist.ppf(dist_fraction)
                 if bounds[1] is None:
                     bounds[1] = dist.ppf(1.0 - dist_fraction)
                 half_bin = (bounds[1] - bounds[0]) / (2 * default_bins)
-                domain = np.linspace(bounds[0] + half_bin,
-                                     bounds[1] - half_bin, default_bins)
+                samples = np.linspace(bounds[0] + half_bin,
+                                      bounds[1] - half_bin, default_bins)
 
-            ticks_list[i] = np.asarray(domain)
+            ticks_list[i] = np.asarray(samples)
             marginals[i] = dist.pdf(ticks_list[i])
 
         elif isinstance(dist, collections.Iterable):
             dist = np.asarray(dist)
-            if (not isinstance(domain, np.ndarray) or
-                    len(domain) != len(dist) or len(dist) == 0):
+            if (not isinstance(samples, np.ndarray) or
+                    len(samples) != len(dist) or len(dist) == 0):
                 raise ValueError("Axes[{}]: 'dist' and 'domain' ndarrays must "
                                  "have equal and valid length".format(i))
 
-            ticks_list[i] = domain
+            ticks_list[i] = samples
             marginals[i] = dist
 
         assert np.isfinite(ticks_list[i]).all() and np.isfinite(marginals[i]).all()
