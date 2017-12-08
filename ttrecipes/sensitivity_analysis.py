@@ -43,7 +43,7 @@ import ttrecipes as tr
 
 
 def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
-                sampling_mode='spatial', dist_fraction=0.00005,
+                dist_fraction=0.00005, fun_mode="array",
                 eps=1e-5, verbose=False, cross_kwargs=None,
                 max_order=2, show=False):
     """Variance-based sensitivity analysis.
@@ -54,38 +54,35 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
 
     Args:
         fun (callable): Callable object representing the N-dimensional function.
-        axes (iterable): A list of axis definitions (bounds and marginal PDF).
+        axes (iterable): A list of axis definitions. Each axis is a `dict` with
+            the name of the axis variable, its domain and its distribution function.
 
-            axis: (name, bins, hard_bounds, marginal_dist)
-            name: ``str``
-            bins: number or None
-                if bins is None:
-                    bins = default_bins
-                else:
-                    bins = int(number) if number > 1 else int(number * default_bins)
-            hard_bounds: None or (lower or None, upper or None)
-            marginal_dist: (scipy.rv_continuous, factor=1) or (dist_name, param1, param2, factor=1)
-                rv_continuous: *frozen* 'scipy.stats.rv_continuous' like class
-                dist_name, param1, param2:
-                    - 'unif': ``param1`` and ``param2`` are ignored
-                    - 'isotriang': ``param1`` and ``param2`` are ignored
-                    - 'triang': ``param1`` = peak (``lower`` <= peak <= ``upper``)
-                    - 'norm': ``param1`` = mu and ``param2`` = sigma
-                    - 'lognorm': ``param1`` = mu and ``param2`` = sigma
-                    - 'gumbel': ``param1`` = mu and ``param2`` = beta
-                    - 'weibull': ``param1`` = alpha (shape) and ``param2`` = beta or lambda (scale)
-                factor: final_pdf => factor * pdf() (factor=1 by default)
+            axis: dict(name, domain, dist)
+                name (str): Variable name. Defaults to x_{i} (i = axis index).
+
+                domain (tuple or np.ndarray): Domain definition. Defaults to tuple(None, None)
+
+                    tuple -> bounds (lower or None, upper or None). None values are
+                        truncated to (dist.ppf(dist_fraction), dist.ppf(1.0 - dist_fraction))
+                    np.ndarray -> actual positions of the samples
+
+                dist (scipy.stats.rv_continuous or np.ndarray): Distribution definition.
+                    Defaults to a uniform distribution in the domain.
+
+                    scipy.stats.rv_continuous-> frozen scipy.stats distribution
+                    np.ndarray -> values of the marginal PDF at the domain positions
 
         default_bins (int, optional): Number of bins for axes without explicit
             definition. Defaults to 100.
-        effective_threshold (float, optional): Threshold for computation of
-            effective dimensions. Defaults to 0.95.
-        sampling_mode (str, optional): ['dist' or 'spatial'] Create a regular
-            distribution of the samples in the distribution or the spatial
-            domain. Defaults to 'spatial'.
+        effective_threshold (float, optional): Threshold (1 - tolerance) for computation of
+            effective dimensions. Defaults to 0.95
         dist_fraction (float, optional): Fraction of the probability distribution
             discarded at each side of the sampling space when using 'spatial'
             sampling. Defaults to 0.00005
+        fun_mode (str, optional): ['array' or 'parameters']. If 'array' (default),
+            the function takes a matrix as input, with one row per evaluation,
+            and returns a vector. If 'parameters', the function takes one instance
+            per call (each variable is an argument), and returns a scalar.
         eps (float, optional): Tolerated relative approximation error in TT
             computations. Defaults to 1e-5.
         verbose (bool, optional): Verbose messages. Defaults to False.
@@ -114,6 +111,7 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
                 'effective_successive': ``int`` in range [1, N]
                 'shapley_values': ``numpy.array`` with shape [N]
                 'banzhaf_coleman_values': ``numpy.array`` with shape [N]
+                '_tr_info': ``dict`` for internal use
             }
 
     Examples:
@@ -146,121 +144,62 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
 
     """
 
-    def get_rv(dist_name, param1, param2, bounds):
-        if dist_name == 'unif':
-            assert bounds[0] <= bounds[1]
-            dist = sp.stats.uniform(loc=bounds[0], scale=bounds[1] - bounds[0])
-        elif dist_name == 'norm':
-            dist = sp.stats.norm(loc=param1, scale=param2)
-        elif dist_name == 'lognorm':
-            dist = sp.stats.lognorm(scale=np.exp(param1), s=param2)
-        elif dist_name == 'triang':
-            assert bounds[0] <= param1 <= bounds[1]
-            scale = bounds[1] - bounds[0]
-            c = (param1 - bounds[0]) / scale
-            dist = sp.stats.triang(scale=scale, c=c)
-        elif dist_name == 'isotriang':
-            dist = sp.stats.triang(loc=bounds[0], scale=bounds[1] - bounds[0],
-                                   c=0.5)
-        elif dist_name == 'gumbel':
-            dist = sp.stats.gumbel_r(param1, param2)
-        elif dist_name == 'weibull':
-            assert param1 > 0 and param2 > 0
-            dist = sp.stats.weibull_min(c=param1, scale=param2)
-        else:
-            raise ValueError(
-                'Invalid distribution identification {}'.format(dist_name))
-        return dist
-
-    def sample_axis(n_ticks, rv, hard_bounds, factor=1.0, mode='pdf'):
-        assert mode in ('dist', 'spatial')
-
-        if mode == 'spatial':
-            if hard_bounds[0] is None:
-                hard_bounds[0] = rv.ppf(dist_fraction)
-            if hard_bounds[1] is None:
-                hard_bounds[1] = rv.ppf(1.0 - dist_fraction)
-            half_bin = (hard_bounds[1] - hard_bounds[0]) / (2 * n_ticks)
-            hard_bounds[0] += half_bin
-            hard_bounds[1] -= half_bin
-
-            ticks = np.linspace(hard_bounds[0], hard_bounds[1], n_ticks)
-            marginal = rv.pdf(ticks)
-            marginal /= np.sum(marginal)
-        else:
-            ppf_bounds = np.asarray([0.0, 1.0])
-            if hard_bounds[0] is not None:
-                ppf_bounds[0] = rv.cdf(hard_bounds[0])
-            if hard_bounds[1] is not None:
-                ppf_bounds[1] = rv.cdf(hard_bounds[1])
-            half_bin = (ppf_bounds[1] - ppf_bounds[0]) / (2 * n_ticks)
-            ppf_bounds[0] += half_bin
-            ppf_bounds[1] -= half_bin
-
-            ticks = rv.ppf(np.linspace(ppf_bounds[0], ppf_bounds[1], n_ticks))
-            marginal = np.ones(ticks.shape) / n_ticks
-
-        ticks *= factor
-        assert np.isfinite(ticks).all() and np.isfinite(marginal).all()
-        return ticks, marginal
-
-    def sample_counter(fun, mode):
-        assert mode in ("array", "parameters")
-        if mode == "array":
-            def wrapped(*args, **kwargs):
-                wrapped.n_samples += args[0].shape[0]
-                return fun(*args, **kwargs)
-        else:
-            def wrapped(*args, **kwargs):
-                wrapped.n_samples += 1
-                return fun(*args, **kwargs)
-
-        wrapped.n_samples = 0
-        return wrapped
-
     N = len(axes)
     names = [''] * N
-    n_ticks = [None] * N
-    rvs = [None] * N
-    factors = [None] * N
     ticks_list = [None] * N
     marginals = [None] * N
 
-    for i, (name, bins, hard_bounds, dist) in enumerate(axes):
-        assert hard_bounds is None or len(hard_bounds) <= 2
-        assert 1 <= len(dist) <= 4
+    for i, axis in enumerate(axes):
+        names[i] = axis.get('name', 'x_{}'.format(i))
+        bounds = None
+        domain = None
 
-        names[i] = name
-        if bins is None:
-            n_ticks[i] = default_bins
+        if 'domain' in axis:
+            if len(axis['domain']) == 2 and not isinstance(axis['domain'], np.ndarray):
+                bounds = list(axis['domain'])
+            else:
+                domain = np.asarray(axis['domain'])
+
+        if 'dist' in axis:
+            dist = axis['dist']
+            if bounds is None:
+                bounds = [None, None]
+        elif domain is not None:
+            dist = np.ones(domain.shape)
+        elif bounds is not None:
+            dist = sp.stats.uniform(loc=bounds[0], scale=bounds[1] - bounds[0])
         else:
-            n_ticks[i] = int(bins) if bins > 1 else int(bins * default_bins)
+            dist = sp.stats.uniform(loc=0, scale=1)
+            bounds = [0., 1.]
 
-        if not isinstance(dist, collections.Iterable):
-            dist = tuple(dist)
-        if len(dist) < 3:
-            rvs[i] = dist[0]
-            factors[i] = 1.0 if len(dist) == 1 else dist[1]
-        else:
-            rvs[i] = get_rv(dist[0], dist[1], dist[2], hard_bounds)
-            factors[i] = 1.0 if len(dist) < 4 else dist[3]
+        assert dist is not None and (bounds is not None or domain is not None)
 
-        if hard_bounds is None:
-            hard_bounds = (None, None)
+        if isinstance(dist, scipy.stats.distributions.rv_frozen):
+            if domain is None:
+                if bounds[0] is None:
+                    bounds[0] = dist.ppf(dist_fraction)
+                if bounds[1] is None:
+                    bounds[1] = dist.ppf(1.0 - dist_fraction)
+                half_bin = (bounds[1] - bounds[0]) / (2 * default_bins)
+                domain = np.linspace(bounds[0] + half_bin,
+                                     bounds[1] - half_bin, default_bins)
 
-        ticks_list[i], marginals[i] = sample_axis(
-            n_ticks[i], rvs[i], np.array(hard_bounds), factors[i], mode=sampling_mode)
+            ticks_list[i] = np.asarray(domain)
+            marginals[i] = dist.pdf(ticks_list[i])
 
-    # pprint.pprint(ticks_list)
-    # pprint.pprint(marginals)
+        elif isinstance(dist, collections.Iterable):
+            dist = np.asarray(dist)
+            if (not isinstance(domain, np.ndarray) or
+                    len(domain) != len(dist) or len(dist) == 0):
+                raise ValueError("Axes[{}]: 'dist' and 'domain' ndarrays must "
+                                 "have equal and valid length".format(i))
 
-    if callable(fun):
-        f = fun
-        mode = "array"
-    else:
-        f = fun[0]
-        mode = fun[1]
-    f = sample_counter(f, mode)
+            ticks_list[i] = domain
+            marginals[i] = dist
+
+        assert np.isfinite(ticks_list[i]).all() and np.isfinite(marginals[i]).all()
+
+    axes = list(zip(names, ticks_list, marginals))
 
     if cross_kwargs is None:
         cross_kwargs = dict()
@@ -270,10 +209,10 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
     model_time = time.time()
     pdf = tt.vector.from_list([marg[np.newaxis, :, np.newaxis] for marg in marginals])
 
-    def f_premultiplied(Xs):
-        return f(Xs) * tr.core.sparse_reco(pdf, tr.core.coordinates_to_indices(Xs, ticks_list=ticks_list))
+    def fun_premultiplied(Xs):
+        return fun(Xs) * tr.core.sparse_reco(pdf, tr.core.coordinates_to_indices(Xs, ticks_list=ticks_list))
 
-    tt_pdf = tr.core.cross(ticks_list, f_premultiplied, mode=mode, eps=eps,
+    tt_pdf, n_samples = tr.core.cross(ticks_list, fun_premultiplied, mode=fun_mode, return_n_samples=True, eps=eps,
                             verbose=verbose, **cross_kwargs)
     model_time = time.time() - model_time
 
@@ -314,7 +253,7 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
         verbose=verbose,
         cross_kwargs=cross_kwargs,
         ticks_list=ticks_list,
-        n_samples=f.n_samples,
+        n_samples=n_samples,
         model_time=model_time,
         sa_time=sa_time,
         tt_pdf=tt_pdf,
@@ -329,10 +268,10 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
     for i, name in enumerate(names):
         metrics['shapley_values'][name] = shapley_values[i]
         metrics['banzhaf_coleman_values'][name] = banzhaf_coleman_values[i]
-    collect_sobol(metrics, max_order)
-    # pprint.pprint(metrics)
+    metrics = collect_sobol(metrics, max_order)
+
     if show:
-        print(tabulate_metrics(metrics, max_order))
+        tabulate_metrics(metrics, max_order)
 
     return metrics
 
@@ -356,9 +295,8 @@ def collect_sobol(metrics, max_order):
     if max_order < 1:
         raise ValueError("'max_order' must be larger than zero")
 
-    axes = metrics['_tr_info']['axes']
-    N = len(axes)
-    names = [axis[0] for axis in axes]
+    names = [axis[0] for axis in metrics['_tr_info']['axes']]
+    N = len(names)
     st = metrics['_tr_info']['st']
     tst = metrics['_tr_info']['tst']
     cst = metrics['_tr_info']['cst']
@@ -388,7 +326,7 @@ def tabulate_metrics(metrics, max_order=None,
                      selection=('indices', 'interactions', 'dimensions', 'dim_dist'),
                      tablefmt="presto", floatfmt=".6f",
                      numalign="decimal", stralign="left",
-                     output_mode='string', show_titles=True):
+                     output_mode='console', show_titles=True):
     """Create tables with the contents of the collected sensitivity metrics.
 
     The tables are generated using 'tabulate'. It is possible to customize the
@@ -410,8 +348,8 @@ def tabulate_metrics(metrics, max_order=None,
             Defaults to 'decimal'.
         stralign (str, optional): tabulate format parameter.
             Defaults to 'left'.
-        output_mode (str, optional): Output mode: 'string' (best for printing) or
-            'collection' (best for exporting). Defaults to 'string'.
+        output_mode (str, optional): Output mode: 'console', 'string' or 'dict'.
+            Defaults to 'console'.
         show_titles (bool, optional): Add single line titles to the tables.
             Defaults to True.
 
@@ -426,7 +364,7 @@ def tabulate_metrics(metrics, max_order=None,
     elif max(metrics['sobol_indices'].keys()) < max_order:
         collect_sobol(metrics, max_order)
 
-    names = metrics['variables']
+    names = [axis[0] for axis in metrics['_tr_info']['axes']]
     outputs = dict()
     tab_fn = functools.partial(tabulate, tablefmt=tablefmt, floatfmt=floatfmt,
                                numalign=numalign, stralign=stralign)
@@ -492,8 +430,11 @@ def tabulate_metrics(metrics, max_order=None,
         out.append("\n")
         outputs['dim_dist'] = '\n'.join(out)
 
-    if output_mode == 'string':
+    if output_mode == 'string' or output_mode == 'console':
         outputs = ''.join(outputs.values())
+        if output_mode == 'console':
+            print(outputs)
+            outputs = None
 
     return outputs
 

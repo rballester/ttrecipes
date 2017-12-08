@@ -36,6 +36,8 @@ def main():
     parser.add_argument('--order', default=default_order, type=int,
                         help="Maximum order of the collected indices "
                              "(default: {})".format(default_order))
+    parser.add_argument('--export', default=False, action='store_true',
+                        help="Export results tables (default: False)")
 
     args = parser.parse_args()
     print("*TT recipes* example:", parser.description, "\n")
@@ -55,9 +57,17 @@ def main():
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-4,
         cross_kwargs=dict(kickrank=4), max_order=args.order, show=True)
 
-    print("+ Plotting obtained metrics...")
+    print("+ Plotting computed metrics...")
     tr.sensitivity_analysis.plot_indices(metrics, show=False)
     tr.sensitivity_analysis.plot_dim_distribution(metrics, max_order=5)
+
+    if args.export:
+        print("+ Exporting example CSV files...")
+        outputs = tr.sensitivity_analysis.tabulate_metrics(
+            metrics, max_order=2, tablefmt='tsv', output_mode='dict', show_titles=False)
+        for key, value in outputs.items():
+            with open("fire_" + key + ".csv", 'w') as f:
+                f.write(value)
 
 
 if __name__ == "__main__":

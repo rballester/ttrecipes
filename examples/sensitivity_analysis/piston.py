@@ -58,7 +58,7 @@ def main():
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-5,
         cross_kwargs=dict(), max_order=args.order, show=True)
 
-    print("+ Querying obtained sensitivity metrics...")
+    print("+ Querying computed sensitivity metrics...")
     print("    Model variables:", metrics['variables'])
 
     print("\t - Highest order-2 total index:",
@@ -79,7 +79,7 @@ def main():
                                               index_type='superset', mode='highest'))
     print("\n")
 
-    print("+ Plotting obtained sensitivity metrics...")
+    print("+ Plotting computed sensitivity metrics...")
     tr.sensitivity_analysis.plot_indices(metrics, show=False)
     tr.sensitivity_analysis.plot_dim_distribution(metrics)
     print("\n")
@@ -87,7 +87,7 @@ def main():
     if args.export:
         print("+ Exporting example CSV files...")
         outputs = tr.sensitivity_analysis.tabulate_metrics(
-            metrics, max_order=2, tablefmt='tsv', output_mode='collection', show_titles=False)
+            metrics, max_order=2, tablefmt='tsv', output_mode='dict', show_titles=False)
         for key, value in outputs.items():
             with open("piston_" + key + ".csv", 'w') as f:
                 f.write(value)

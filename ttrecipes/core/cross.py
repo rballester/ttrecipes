@@ -15,7 +15,8 @@ import tt
 import ttrecipes as tr
 
 
-def cross(ticks_list, fun, mode="array", qtt=False, eps=1e-3, verbose=False, **kwargs):
+def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samples=False, eps=1e-3, verbose=False,
+**kwargs):
     """
     Create a TT from a function and a list of discretized axes (the ticks). This function is mostly a convenience
     wrapper for ttpy's multifuncrs2
@@ -24,10 +25,12 @@ def cross(ticks_list, fun, mode="array", qtt=False, eps=1e-3, verbose=False, **k
     :param fun: the black-box procedure
     :param mode: if "parameters", :param: `fun` takes its N inputs as N parameters. If "array" (default), :param: `fun` takes a single input, namely a P x N array, and returns an iterable with P elements. Mode "array" has *much* less overhead, which makes a difference especially with many function evaluations
     :param qtt: if True, QTT indexing is used, i.e. each axis is reshaped to 2 x ... x 2 and then all dimensions interleaved (all axes must have the same number of ticks, a power of 2). Default is False
+    :param callback: if not None, this function will be regularly called with a value in [0, 1] that estimates the fraction of the cross-approximation that has been completed. Default is None
+    :param return_n_samples: if True, return also the number of samples taken
     :param eps:
     :param verbose:
     :param kwargs: these will be passed to ttpy's multifuncrs2
-    :return:
+    :return: a TT, or (TT, n_samples) if return_n_samples is True
 
     """
 
@@ -45,6 +48,16 @@ def cross(ticks_list, fun, mode="array", qtt=False, eps=1e-3, verbose=False, **k
     else:
         shape = [len(ticks) for ticks in ticks_list]
 
+    if 'nswp' not in kwargs:
+        nswp = 10  # ttpy's default
+    else:
+        nswp = kwargs['nswp']
+    total_calls = nswp*2*(N*3 - 2)
+    global n_calls
+    n_calls = 0
+    global n_samples
+    n_samples = 0
+
     def indices_to_coordinates(Xs):
         """
         Map integer indices (tensor entries) to coordinates via a given ticks_list
@@ -54,6 +67,13 @@ def cross(ticks_list, fun, mode="array", qtt=False, eps=1e-3, verbose=False, **k
         :return coordinates: a P x N matrix
 
         """
+
+        global n_calls
+        n_calls += 1
+        if callback is not None:
+            callback(n_calls / float(total_calls))
+        global n_samples
+        n_samples += len(Xs)
 
         Xs = Xs.astype(int)
         if qtt:
@@ -78,4 +98,10 @@ def cross(ticks_list, fun, mode="array", qtt=False, eps=1e-3, verbose=False, **k
     grids = tr.core.meshgrid(shape)
     if verbose:
         print("Cross-approximating a {}D function with target error {}...".format(N, eps))
-    return tt.multifuncrs2(grids, f, eps=eps, verb=verbose, **kwargs)
+    result = tt.multifuncrs2(grids, f, eps=eps, verb=verbose, **kwargs)
+    if verbose:
+        print('Function evaluations: {}'.format(n_samples))
+        print('The resulting tensor has ranks {} and {} elements'.format([r for r in result.r], len(result.core)))
+    if return_n_samples:
+        return result, n_samples
+    return result
