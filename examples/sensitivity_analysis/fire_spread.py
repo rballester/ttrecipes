@@ -44,10 +44,6 @@ def main():
     if args.verbose:
         pprint.pprint(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-
     f, axes = tr.models.get_fire_spread(wind_factor=6.9)
     if args.verbose:
         pprint.pprint(axes)
@@ -55,7 +51,8 @@ def main():
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
     metrics = tr.sensitivity_analysis.var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-4,
-        cross_kwargs=dict(kickrank=4), max_order=args.order, show=True)
+        random_seed=args.seed, cross_kwargs=dict(kickrank=4),
+        max_order=args.order, show=True)
 
     print("+ Plotting computed metrics...")
     tr.sensitivity_analysis.plot_indices(metrics, show=False)

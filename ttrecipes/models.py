@@ -18,8 +18,76 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+import collections
 import scipy as sp
 import scipy.stats
+
+
+def parse_axes(axes, default_bins, dist_fraction=1e-4/2):
+    N = len(axes)
+    names = [''] * N
+    ticks_list = [None] * N
+    marginals = [None] * N
+
+    for i, axis in enumerate(axes):
+        names[i] = axis.get('name', 'x_{}'.format(i))
+        bounds = None
+        samples = None
+
+        domain = axis.get('domain', None)
+        if domain is not None:
+            if len(domain) == 2 and not isinstance(domain, np.ndarray):
+                bounds = list(domain)
+            else:
+                samples = np.asarray(domain)
+
+        dist = axis.get('dist', None)
+        if dist is not None:
+            if bounds is None:
+                bounds = [None, None]
+        elif samples is not None:
+            dist = np.ones(samples.shape)
+        elif bounds is not None:
+            dist = sp.stats.uniform(loc=bounds[0], scale=bounds[1] - bounds[0])
+        else:
+            dist = sp.stats.uniform(loc=0, scale=1)
+            bounds = [0., 1.]
+
+        assert dist is not None and (bounds is not None or samples is not None)
+
+        if isinstance(dist, scipy.stats.distributions.rv_frozen):
+            if samples is None:
+                if bounds[0] is None:
+                    bounds[0] = dist.ppf(dist_fraction)
+                if bounds[1] is None:
+                    bounds[1] = dist.ppf(1.0 - dist_fraction)
+                half_bin = (bounds[1] - bounds[0]) / (2 * default_bins)
+                samples = np.linspace(bounds[0] + half_bin,
+                                      bounds[1] - half_bin, default_bins)
+
+            ticks_list[i] = np.asarray(samples)
+            marginals[i] = dist.pdf(ticks_list[i])
+
+        elif isinstance(dist, collections.Sized):
+            dist = np.asarray(dist)
+            if (not isinstance(samples, np.ndarray) or
+                    len(samples) != len(dist) or len(dist) == 0):
+                raise ValueError("Axes[{}]: 'dist' and 'domain' ndarrays must "
+                                 "have equal and valid length".format(i))
+
+            ticks_list[i] = samples
+            marginals[i] = dist
+
+        else:
+            raise ValueError("Unrecognized axis distribution: must be either a vector "
+                             "containing the discretized pdf, or a frozen distribution "
+                             "from scipy.stats.distributions")
+
+        marginals[i] /= np.sum(marginals[i])
+
+        assert np.isfinite(ticks_list[i]).all() and np.isfinite(marginals[i]).all()
+
+    return names, ticks_list, marginals
 
 
 def get_linear_mix(N, betas=1.0, sigmas=1.0, name_tmpl='x_{}'):

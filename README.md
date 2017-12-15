@@ -17,18 +17,32 @@
 
 ## Installation
 
-The current version of the _ttpy_ toolbox in PyPI has some incompatibilities with _TT recipes_. The provided _requirements.txt_ file installs a valid version from its GitHub [repository](https://github.com/oseledets/ttpy). The recommended way to install _TT recipes_ and its dependencies is:
+The current version of the _ttpy_ toolbox in PyPI has some incompatibilities with _TT recipes_. The provided _requirements.txt_ and _environment.yml_ files install a compatible version from the _ttpy_ [repository](https://github.com/oseledets/ttpy). The recommended way to install _TT recipes_ and its dependencies is:
 
     git clone https://github.com/rballester/ttrecipes.git
     cd ttrecipes
+
+If you use __conda__, you can create an environment with all the dependencies:
+
+    conda env create --file environment.yml
+
+Or, if you prefer __pip__, install the required packages with these commands:
+
     pip install numpy cython
     pip install -r requirements.txt
+
+In both cases, run this last command to install __ttrecipes__ in editable mode:
+
+    pip install -e .
 
 ## Examples
 
 See the ```examples/``` folder for some sample scripts. Check out [this Jupyter Notebook](https://github.com/rballester/ttrecipes/blob/master/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb) for the examples used in our paper *Tensor Approximation of Advanced Metrics for Sensitivity Analysis*.
 
-You can also run it on Microsoft Azure Notebooks (a free account is needed): [![Azure Notebooks](https://notebooks.azure.com/launch.png)](https://notebooks.azure.com/egparedes/libraries/ttrecipes/html/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb)
+You can also run and interact with the notebook online using Binder or Microsoft Azure Notebooks (a free Azure account is needed).
+
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
+[![Azure Notebooks](https://notebooks.azure.com/launch.png)](https://notebooks.azure.com/egparedes/libraries/ttrecipes/html/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb)
 
 ## References
 

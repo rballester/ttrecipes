@@ -53,10 +53,6 @@ def main():
     if args.verbose:
         pprint.pprint(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-
     f, axes = tr.models.get_decay_poisson(
         N=args.products, span=args.years, hl_range=(3.0 * (1 / 12.0), 3.0),
         time_step=1.0 / 365.0, name_tmpl='lambda_{:0>2}')
@@ -66,7 +62,7 @@ def main():
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
     metrics = tr.sensitivity_analysis.var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-4,
-        cross_kwargs=dict(), max_order=args.order, show=True)
+        random_seed=args.seed, cross_kwargs=dict(), max_order=args.order, show=True)
 
     if args.export:
         print("+ Exporting example CSV files...")

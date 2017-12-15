@@ -1,0 +1,13 @@
+# run: conda env create --file environment.yml
+name: ttrecipes
+dependencies:
+- python>=3.3
+- pip
+- numpy
+- scipy
+- six
+- cython
+- matplotlib
+- pip:
+  - git+https://github.com/oseledets/ttpy@4e4cf970fad9a4ad39efcab3d009326a71113a49#egg=ttpy
+  - git+https://github.com/rballester/ttrecipes#egg=ttrecipes

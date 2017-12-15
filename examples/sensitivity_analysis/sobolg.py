@@ -52,11 +52,7 @@ def main():
     if args.verbose:
         pprint.pprint(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-
-    f, axes = tr.models.get_sobol_g(args.dims, a=args.acoeff, 
+    f, axes = tr.models.get_sobol_g(args.dims, a=args.acoeff,
                                     name_tmpl='X_{:0>2}')
     if args.verbose:
         pprint.pprint(axes)
@@ -64,7 +60,7 @@ def main():
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
     metrics = tr.sensitivity_analysis.var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-10,
-        cross_kwargs=dict(kickrank=2), max_order=args.order, show=True)
+        random_seed=args.seed, cross_kwargs=dict(kickrank=2), max_order=args.order, show=True)
 
     if args.export:
         print("+ Exporting example CSV files...")

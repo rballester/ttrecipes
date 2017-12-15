@@ -45,10 +45,6 @@ def main():
     if args.verbose:
         pprint.pprint(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-
     f, axes = tr.models.get_piston()
     if args.verbose:
         pprint.pprint(axes)
@@ -56,7 +52,7 @@ def main():
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
     metrics = tr.sensitivity_analysis.var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-5,
-        cross_kwargs=dict(), max_order=args.order, show=True)
+        random_seed=args.seed, cross_kwargs=dict(), max_order=args.order, show=True)
 
     print("+ Querying computed sensitivity metrics...")
     print("    Model variables:", metrics['variables'])

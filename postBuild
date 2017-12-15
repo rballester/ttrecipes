@@ -1,0 +1,2 @@
+# postBuild configuration script for Binder (https://mybinder.org/)
+pip install -e .

@@ -20,10 +20,10 @@ Todo:
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import collections
 import functools
 import itertools
 import pprint
+import random
 import time
 
 import numpy as np
@@ -34,9 +34,8 @@ try:
     import matplotlib
     import matplotlib.pyplot as plt
 except ImportError:
-    TTRECIPES_PLOT_FUNCTIONS_ENABLED = False
-else:
-    TTRECIPES_PLOT_FUNCTIONS_ENABLED = True
+    matplotlib = None
+    plt = None
 
 import tt
 import ttrecipes as tr
@@ -44,7 +43,7 @@ import ttrecipes as tr
 
 def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
                 dist_fraction=0.00005, fun_mode="array",
-                eps=1e-5, verbose=False, cross_kwargs=None,
+                eps=1e-5, verbose=False, cross_kwargs=None, random_seed=None,
                 max_order=2, show=False):
     """Variance-based sensitivity analysis.
 
@@ -56,21 +55,25 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
         fun (callable): Callable object representing the N-dimensional function.
         axes (iterable): A list of axis definitions. Each axis is a `dict` with
             the name of the axis variable, its domain and its distribution function.
+            If the domain and the distribution function are both undefined,
+            a uniform(0, 1) distribution is assumed for the axis.
 
             axis: dict(name, domain, dist)
                 name (str): Variable name. Defaults to x_{i} (i = axis index).
 
-                domain (tuple or np.ndarray): Domain definition. Defaults to tuple(None, None)
+                domain (tuple or np.ndarray): Domain definition.
+                    Defaults to tuple(None, None) when dist is defined.
 
                     tuple -> bounds (lower or None, upper or None). None values are
                         truncated to (dist.ppf(dist_fraction), dist.ppf(1.0 - dist_fraction))
-                    np.ndarray -> actual positions of the samples
+                    np.ndarray -> samples (actual positions in the axis)
 
                 dist (scipy.stats.rv_continuous or np.ndarray): Distribution definition.
-                    Defaults to a uniform distribution in the domain.
+                    Defaults to a uniform distribution in the defined domain.
 
                     scipy.stats.rv_continuous-> frozen scipy.stats distribution
-                    np.ndarray -> values of the marginal PDF at the domain positions
+                    np.ndarray -> values of the marginal PDF at the sampled domain positions.
+                        In this case, domain must contain a np.ndarray of the same size.
 
         default_bins (int, optional): Number of bins for axes without explicit
             definition. Defaults to 100.
@@ -88,6 +91,8 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
         verbose (bool, optional): Verbose messages. Defaults to False.
         cross_kwargs (:obj:`dict`, optional): Parameters for the cross
             approximations. Defaults to None.
+        random_seed: value to initialize random generators to get reproducible results.
+            Defaults to None.
         max_order (int, optional): Maximum order of the collected Sobol indices.
             Defaults to 2.
         show (bool, optional): Print results. Defaults to False.
@@ -128,7 +133,7 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
 
             metrics = sensitivity_analysis.var_metrics(
                 my_function, axes, eps=1e-3, verbose=True)
-            print_metrics(metrics)
+            tabulate_metrics(metrics)
 
     References:
         * R. Ballester-Ripoll, E. G. Paredes, R. Pajarola. (2017)
@@ -146,65 +151,18 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
     """
 
     N = len(axes)
-    names = [''] * N
-    ticks_list = [None] * N
-    marginals = [None] * N
 
-    for i, axis in enumerate(axes):
-        names[i] = axis.get('name', 'x_{}'.format(i))
-        bounds = None
-        samples = None
-
-        domain = axis.get('domain', None)
-        if domain is not None:
-            if len(domain) == 2 and not isinstance(domain, np.ndarray):
-                bounds = list(domain)
-            else:
-                samples = np.asarray(domain)
-
-        dist = axis.get('dist', None)
-        if dist is not None:
-            if bounds is None:
-                bounds = [None, None]
-        elif samples is not None:
-            dist = np.ones(samples.shape)
-        elif bounds is not None:
-            dist = sp.stats.uniform(loc=bounds[0], scale=bounds[1] - bounds[0])
-        else:
-            dist = sp.stats.uniform(loc=0, scale=1)
-            bounds = [0., 1.]
-
-        assert dist is not None and (bounds is not None or samples is not None)
-
-        if isinstance(dist, scipy.stats.distributions.rv_frozen):
-            if samples is None:
-                if bounds[0] is None:
-                    bounds[0] = dist.ppf(dist_fraction)
-                if bounds[1] is None:
-                    bounds[1] = dist.ppf(1.0 - dist_fraction)
-                half_bin = (bounds[1] - bounds[0]) / (2 * default_bins)
-                samples = np.linspace(bounds[0] + half_bin,
-                                      bounds[1] - half_bin, default_bins)
-
-            ticks_list[i] = np.asarray(samples)
-            marginals[i] = dist.pdf(ticks_list[i])
-
-        elif isinstance(dist, collections.Iterable):
-            dist = np.asarray(dist)
-            if (not isinstance(samples, np.ndarray) or
-                    len(samples) != len(dist) or len(dist) == 0):
-                raise ValueError("Axes[{}]: 'dist' and 'domain' ndarrays must "
-                                 "have equal and valid length".format(i))
-
-            ticks_list[i] = samples
-            marginals[i] = dist
-
-        assert np.isfinite(ticks_list[i]).all() and np.isfinite(marginals[i]).all()
+    names, ticks_list, marginals = tr.models.parse_axes(
+        axes, default_bins=default_bins, dist_fraction=dist_fraction)
 
     axes = list(zip(names, ticks_list, marginals))
 
     if cross_kwargs is None:
         cross_kwargs = dict()
+
+    if random_seed is not None:
+        random.seed(random_seed)
+        np.random.seed(random_seed)
 
     if verbose:
         print("\n-> Building surrogate model")
@@ -214,8 +172,9 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
     def fun_premultiplied(Xs):
         return fun(Xs) * tr.core.sparse_reco(pdf, tr.core.coordinates_to_indices(Xs, ticks_list=ticks_list))
 
-    tt_pdf, n_samples = tr.core.cross(ticks_list, fun_premultiplied, mode=fun_mode, return_n_samples=True, eps=eps,
-                            verbose=verbose, **cross_kwargs)
+    tt_pdf, n_samples = tr.core.cross(ticks_list, fun_premultiplied, mode=fun_mode,
+                                      return_n_samples=True, eps=eps, verbose=verbose,
+                                      **cross_kwargs)
     model_time = time.time() - model_time
 
     if verbose:
@@ -336,7 +295,7 @@ def tabulate_metrics(metrics, max_order=None,
 
     Args:
         metrics (dict): Collected sensitivity metrics
-            (typically obtained from: metrics, _ = var_metrics(...))
+            (typically obtained from: metrics = var_metrics(...))
         max_order (int, optional): Maximum order of the collected Sobol indices.
             If None (default), use the current value in 'metrics'.
         selection (iterable, optional): Tables to be generated.
@@ -542,7 +501,7 @@ def plot_indices(metrics, indices=('sobol', 'shapley', 'total'),
 
     Args:
         metrics (dict): Collected sensitivity metrics
-            (typically obtained from: metrics, _ = var_metrics(...))
+            (typically obtained from: metrics = var_metrics(...))
         indices (iterable, optional): Ordered selection of sensitivity indices.
             The options are: 'sobol', 'shapley', 'total'.
             Defaults to ('sobol', 'shapley', 'total').
@@ -557,7 +516,7 @@ def plot_indices(metrics, indices=('sobol', 'shapley', 'total'),
         ax, fig: Tuple of 'axis' and 'figure' Matplotlib objects.
 
     """
-    if not TTRECIPES_PLOT_FUNCTIONS_ENABLED:
+    if matplotlib is None:
         print("Matplotlib not found: plotting functions are disabled")
         return None, None
 
@@ -602,7 +561,7 @@ def plot_dim_distribution(metrics, marks=('cumulative', 'mean', 'superposition')
 
     Args:
         metrics (dict): Collected sensitivity metrics
-            (typically obtained from: metrics, _ = var_metrics(...))
+            (typically obtained from: metrics = var_metrics(...))
         marks (iterable, optional): Selection of dimension metrics.
             The options are: 'cumulative', 'mean', 'superposition'.
             Defaults to ('cumulative', 'mean', 'superposition').
@@ -624,7 +583,7 @@ def plot_dim_distribution(metrics, marks=('cumulative', 'mean', 'superposition')
 
     """
 
-    if not TTRECIPES_PLOT_FUNCTIONS_ENABLED:
+    if matplotlib is None:
         print("Matplotlib not found: plotting functions are disabled")
         return None, None
 
@@ -672,7 +631,7 @@ def plot_dim_distribution(metrics, marks=('cumulative', 'mean', 'superposition')
         mean_d = metrics['mean_dimension']
         ax.axvline(mean_d, c=colors['mean'], linestyle='-', zorder=1)
         if annotate:
-            ax.text( mean_d, 0.5,
+            ax.text(mean_d, 0.5,
                     (' $D_S=' + float_fmt + '$').format(mean_d).format(mean_d),
                     color=colors['mean'], fontsize=fontsize)
 
