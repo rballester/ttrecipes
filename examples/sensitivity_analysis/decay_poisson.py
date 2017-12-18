@@ -39,6 +39,8 @@ def main():
     parser.add_argument('--order', default=default_order, type=int,
                         help="Maximum order of the collected indices "
                              "(default: {})".format(default_order))
+    parser.add_argument('--export', default=False, action='store_true',
+                        help="Export results tables (default: False)")
     parser.add_argument('--products', default=default_products, type=int,
                         help='Number of decaying products in the chain '
                              '(default: {})'.format(default_products))
@@ -51,20 +53,24 @@ def main():
     if args.verbose:
         pprint.pprint(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-
     f, axes = tr.models.get_decay_poisson(
-        d=args.products, span=args.years, hl_range=(3.0 * (1 / 12.0), 3.0),
+        N=args.products, span=args.years, hl_range=(3.0 * (1 / 12.0), 3.0),
         time_step=1.0 / 365.0, name_tmpl='lambda_{:0>2}')
     if args.verbose:
         pprint.pprint(axes)
 
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
-    results = tr.sensitivity_analysis.var_metrics(
+    metrics = tr.sensitivity_analysis.var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-4,
-        max_order=args.order, cross_kwargs=dict(), print_results=True)
+        random_seed=args.seed, cross_kwargs=dict(), max_order=args.order, show=True)
+
+    if args.export:
+        print("+ Exporting example CSV files...")
+        outputs = tr.sensitivity_analysis.tabulate_metrics(
+            metrics, max_order=2, tablefmt='tsv', output_mode='dict', show_titles=False)
+        for key, value in outputs.items():
+            with open("decay_" + key + ".csv", 'w') as f:
+                f.write(value)
 
 
 if __name__ == "__main__":

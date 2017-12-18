@@ -40,6 +40,6 @@ class TestCompletion(TestCase):
         P = int(np.prod(Is) / 10)
         Xs = tr.core.LHS(gt.n, P)
         ys = tr.core.sparse_reco(gt, Xs)
-        completed = tr.core.continuous_ALS(Xs, ys, shape=Is, ranks=Rs, ranks2=Ss, nswp=10, verbose=True)
+        completed = tr.core.pce_interpolation(Xs, ys, shape=Is, ranks=Rs, ranks2=Ss, maxswp=10, verbose=True)
         reco = tr.core.sparse_reco(completed, Xs)
         self.assertLessEqual(np.linalg.norm(reco - ys) / np.linalg.norm(ys), 1e-5)

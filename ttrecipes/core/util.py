@@ -143,6 +143,7 @@ def indices_to_coordinates(Xs, ticks_list):
 
     N = len(ticks_list)
     assert Xs.shape[1] == N
+    Xs = Xs.astype(int)
 
     coordinates = np.zeros(Xs.shape)
     for dim in range(N):
@@ -505,10 +506,30 @@ def meshgrid(shape):
 
 
 def sum(t):
+    """
+    Sum all elements of a TT
+
+    :param t:
+    :return: a scalar
+
+    """
+
     result = np.array([[1]])
     for core in tt.vector.to_list(t):
         result = result.dot(np.sum(core, axis=1))
     return np.squeeze(result)
+
+
+def mean(t):
+    """
+    Average all elements of a TT
+
+    :param t:
+    :return: a scalar
+
+    """
+
+    return tr.core.sum(t) / np.prod(t.n)
 
 
 def sum_repeated(Xs, ys):

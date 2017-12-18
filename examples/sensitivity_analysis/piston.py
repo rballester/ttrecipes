@@ -37,24 +37,56 @@ def main():
     parser.add_argument('--order', default=default_order, type=int,
                         help="Maximum order of the collected indices "
                              "(default: {})".format(default_order))
+    parser.add_argument('--export', default=False, action='store_true',
+                        help="Export results tables (default: False)")
 
     args = parser.parse_args()
     print("*TT recipes* example:", parser.description, "\n")
     if args.verbose:
         pprint.pprint(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-
     f, axes = tr.models.get_piston()
     if args.verbose:
         pprint.pprint(axes)
 
     print("+ Computing tensor approximations of variance-based sensitivity metrics...")
-    results = tr.sensitivity_analysis.var_metrics(
+    metrics = tr.sensitivity_analysis.var_metrics(
         f, axes, default_bins=args.bins, verbose=args.verbose, eps=1e-5,
-        max_order=args.order, cross_kwargs=dict(), print_results=True)
+        random_seed=args.seed, cross_kwargs=dict(), max_order=args.order, show=True)
+
+    print("+ Querying computed sensitivity metrics...")
+    print("    Model variables:", metrics['variables'])
+
+    print("\t - Highest order-2 total index:",
+          tr.sensitivity_analysis.query_sobol(metrics, max_order=2,
+                                              index_type='total'))
+
+    print("\t - Lowest order-1 closed index:",
+          tr.sensitivity_analysis.query_sobol(metrics, min_order=1,
+                                              index_type='closed', mode='lowest'))
+
+    print("\t - Highest order-2 superset index, other than ['T_a'} (or [5]):",
+          tr.sensitivity_analysis.query_sobol(metrics, exclude=['T_a'], max_order=2,
+                                              index_type='superset', mode='highest'))
+
+    print("\t - Single variable that interacts the most with ['S'] (or [1]):",
+          tr.sensitivity_analysis.query_sobol(metrics, include=['S'],
+                                              min_order=2, max_order=2,
+                                              index_type='superset', mode='highest'))
+    print("\n")
+
+    print("+ Plotting computed sensitivity metrics...")
+    tr.sensitivity_analysis.plot_indices(metrics, show=False)
+    tr.sensitivity_analysis.plot_dim_distribution(metrics)
+    print("\n")
+
+    if args.export:
+        print("+ Exporting example CSV files...")
+        outputs = tr.sensitivity_analysis.tabulate_metrics(
+            metrics, max_order=2, tablefmt='tsv', output_mode='dict', show_titles=False)
+        for key, value in outputs.items():
+            with open("piston_" + key + ".csv", 'w') as f:
+                f.write(value)
 
 
 if __name__ == "__main__":

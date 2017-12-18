@@ -11,6 +11,7 @@ from future.builtins import range
 
 import numpy as np
 import scipy as sp
+import scipy.signal
 import tt
 
 import ttrecipes as tr
@@ -43,7 +44,7 @@ def sobol_tt(t, pdf=None, premultiplied=False, eps=1e-6, verbose=False, **kwargs
         if np.max(pdf.r) == 1:
             tpdf = t*pdf
         else:
-            tpdf = tt.multifuncrs2([t, pdf], lambda x: x[:, 0] * x[:, 1], eps=eps, verb=verbose, y0=t, **kwargs)
+            tpdf = tt.multifuncrs2([t, pdf], lambda x: x[:, 0] * x[:, 1], y0=t, eps=eps, verb=verbose, **kwargs)
     t2 = tt.vector.from_list([np.concatenate([np.sum(core, axis=1, keepdims=True), core], axis=1) for core in tt.vector.to_list(tpdf)])
 
     pdf2 = tt.vector.from_list([np.concatenate([np.sum(core, axis=1, keepdims=True), core], axis=1) for core in tt.vector.to_list(pdf)])
@@ -52,7 +53,7 @@ def sobol_tt(t, pdf=None, premultiplied=False, eps=1e-6, verbose=False, **kwargs
         x[x[:, 1] == 0, 1] = float('inf')
         result = (x[:, 0]**2 / x[:, 1])
         return result
-    t_normalized_sq = tt.multifuncrs2([t2, pdf2], fun, eps=eps, verb=verbose, **kwargs)
+    t_normalized_sq = tt.multifuncrs2([t2, pdf2], fun, y0=t2, eps=eps, verb=verbose, **kwargs)
 
     sobol = tt.vector.from_list([np.concatenate([core[:, 0:1, :], np.sum(core[:, 1:, :], axis=1, keepdims=True) - core[:, 0:1, :]], axis=1) for core in tt.vector.to_list(t_normalized_sq)])
     sobol *= (1. / (tr.core.sum(sobol) - sobol[[0, ]*N]))
@@ -63,8 +64,7 @@ def sobol_tt(t, pdf=None, premultiplied=False, eps=1e-6, verbose=False, **kwargs
 def semivalues(game, ps, p=None, eps=1e-10):
     """
     Compute all N semivalues for each of N players. Each semivalue 1, ..., N has cost O(N^3 R) + O(N^2 R^2),
-    where R is the
-    game's rank
+    where R is the game's rank
 
     References:
 

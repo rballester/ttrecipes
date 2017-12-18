@@ -17,25 +17,80 @@ work as sensible examples for real-world models.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import collections
-import functools
-
 import numpy as np
+import collections
+import scipy as sp
+import scipy.stats
 
 
-def make_unif_axes(n, bounds=(0.0, 1.0), name_tmpl='x{}'):
-    assert n > 0
-    return tuple([(name_tmpl.format(i + 1), None, bounds, ('unif', None, None))
-                  for i in range(n)])
+def parse_axes(axes, default_bins, dist_fraction=1e-4/2):
+    N = len(axes)
+    names = [''] * N
+    ticks_list = [None] * N
+    marginals = [None] * N
+
+    for i, axis in enumerate(axes):
+        names[i] = axis.get('name', 'x_{}'.format(i))
+        bounds = None
+        samples = None
+
+        domain = axis.get('domain', None)
+        if domain is not None:
+            if len(domain) == 2 and not isinstance(domain, np.ndarray):
+                bounds = list(domain)
+            else:
+                samples = np.asarray(domain)
+
+        dist = axis.get('dist', None)
+        if dist is not None:
+            if bounds is None:
+                bounds = [None, None]
+        elif samples is not None:
+            dist = np.ones(samples.shape)
+        elif bounds is not None:
+            dist = sp.stats.uniform(loc=bounds[0], scale=bounds[1] - bounds[0])
+        else:
+            dist = sp.stats.uniform(loc=0, scale=1)
+            bounds = [0., 1.]
+
+        assert dist is not None and (bounds is not None or samples is not None)
+
+        if isinstance(dist, scipy.stats.distributions.rv_frozen):
+            if samples is None:
+                if bounds[0] is None:
+                    bounds[0] = dist.ppf(dist_fraction)
+                if bounds[1] is None:
+                    bounds[1] = dist.ppf(1.0 - dist_fraction)
+                half_bin = (bounds[1] - bounds[0]) / (2 * default_bins)
+                samples = np.linspace(bounds[0] + half_bin,
+                                      bounds[1] - half_bin, default_bins)
+
+            ticks_list[i] = np.asarray(samples)
+            marginals[i] = dist.pdf(ticks_list[i])
+
+        elif isinstance(dist, collections.Sized):
+            dist = np.asarray(dist)
+            if (not isinstance(samples, np.ndarray) or
+                    len(samples) != len(dist) or len(dist) == 0):
+                raise ValueError("Axes[{}]: 'dist' and 'domain' ndarrays must "
+                                 "have equal and valid length".format(i))
+
+            ticks_list[i] = samples
+            marginals[i] = dist
+
+        else:
+            raise ValueError("Unrecognized axis distribution: must be either a vector "
+                             "containing the discretized pdf, or a frozen distribution "
+                             "from scipy.stats.distributions")
+
+        marginals[i] /= np.sum(marginals[i])
+
+        assert np.isfinite(ticks_list[i]).all() and np.isfinite(marginals[i]).all()
+
+    return names, ticks_list, marginals
 
 
-def make_gaussian_axes(n, sigmas, name_tmpl='x{}'):
-    assert 0 < n == len(sigmas)
-    return tuple([(name_tmpl.format(i + 1), None, None, ('norm', 0.0, sigmas[i]))
-                  for i, sigma in enumerate(sigmas)])
-
-
-def get_linear_mix(d, betas=1.0, sigmas=1.0, name_tmpl='x{}'):
+def get_linear_mix(N, betas=1.0, sigmas=1.0, name_tmpl='x_{}'):
     """Test function used for various numerical estimation methods.
 
     References:
@@ -46,30 +101,23 @@ def get_linear_mix(d, betas=1.0, sigmas=1.0, name_tmpl='x{}'):
          https://hal.inria.fr/hal-01556303/document
 
     """
-    assert d > 0
 
-    if isinstance(betas, collections.Iterable):
-        betas = np.asarray(betas)
-        assert len(betas) == d
-    else:
-        betas *= np.ones(d)
+    assert N > 0
 
-    if isinstance(sigmas, collections.Iterable):
-        sigmas = np.asarray(sigmas)
-        assert len(sigmas) == d
-    else:
-        sigmas *= np.ones(d)
+    betas = np.asarray(betas) * np.ones(N)
+    sigmas = np.asarray(sigmas) * np.ones(N)
 
-    def function(Xs, betas):
-        assert Xs.shape[1] == d == len(betas)
+    def function(Xs, betas=betas):
+        assert Xs.shape[1] == N == len(betas)
         return Xs.dot(betas)
 
-    axes = make_gaussian_axes(d, sigmas, name_tmpl=name_tmpl)
+    axes = [dict(name=name_tmpl.format(n), dist=sp.stats.norm(scale=sigma))
+            for n, sigma in enumerate(sigmas)]
 
-    return functools.partial(function, betas=betas), axes
+    return function, axes
 
 
-def get_ishigami(a=7, b=0.1, name_tmpl='x{}'):
+def get_ishigami(a=7, b=0.1, name_tmpl='x_{}'):
     """The Ishigami function of Ishigami & Homma (1990).
 
      This very well-known function exhibits strong nonlinearity and
@@ -89,16 +137,16 @@ def get_ishigami(a=7, b=0.1, name_tmpl='x{}'):
             First International Symposium on (pp. 398-403). IEEE.
 
     """
-    def function(Xs):
+    def function(Xs, a=a, b=b):
         assert Xs.shape[1] == 3
         return np.sin(Xs[:, 0]) + a * np.sin(Xs[:, 1])**2 + b * (Xs[:, 2]**4) * np.sin(Xs[:, 0])
 
-    axes = make_unif_axes(3, bounds=(-np.pi, np.pi), name_tmpl=name_tmpl)
+    axes = [dict(name=name_tmpl.format(n), domain=(-np.pi, np.pi)) for n in range(3)]
 
     return function, axes
 
 
-def get_sobol_g(d, a=6.52, name_tmpl='x{}'):
+def get_sobol_g(N, a=6.52, name_tmpl='x_{}'):
     """Test function used for various numerical estimation methods.
 
     The function is integrated over the hypercube [0, 1], ``for i in range(d)``
@@ -141,27 +189,24 @@ def get_sobol_g(d, a=6.52, name_tmpl='x{}'):
             Integration, 2nd Edition".  Academic Press
 
     """
-    assert d > 0
 
-    if isinstance(a, collections.Iterable):
-        a = np.asarray(a)
-        assert len(a) == d
-    else:
-        a *= np.ones(d)
+    assert N > 0
 
-    def function(Xs, a):
-        assert(Xs.shape[1] == d)
+    a = np.asarray(a) * np.ones(N)
+
+    def function(Xs, a=a):
+        assert(Xs.shape[1] == N)
         result = np.ones(Xs.shape[0])
         for i in range(Xs.shape[1]):
             result *= (np.abs(4. * Xs[:, i] - 2) + a[i]) / (1. + a[i])
         return result
 
-    axes = make_unif_axes(d, name_tmpl=name_tmpl)
+    axes = [dict(name=name_tmpl.format(n)) for n in range(N)]
 
-    return functools.partial(function, a=a), axes
+    return function, axes
 
 
-def get_prod(d, constant=1, name_tmpl='x{}'):
+def get_prod(N, k=1, name_tmpl='x_{}'):
     """Analytical test function used for sensitivity analysis.
 
     References:
@@ -170,21 +215,22 @@ def get_prod(d, constant=1, name_tmpl='x{}'):
             Reliability Engineering & System Safety, 96(4), 440-449.
 
     """
-    assert d > 0
 
-    def function(Xs, constant):
+    assert N > 0
+
+    def function(Xs, k=k):
 
         Xs = np.asarray(Xs)
-        assert(Xs.shape[1] == d)
-        return np.prod(np.abs(4 * Xs - 2), axis=1)
+        assert(Xs.shape[1] == N)
+        return np.prod(np.abs(k * Xs - 2), axis=1)
 
-    axes = make_unif_axes(d, name_tmpl=name_tmpl)
+    axes = [dict(name=name_tmpl.format(n)) for n in range(N)]
 
-    return functools.partial(function, constant=constant), axes
+    return function, axes
 
 
-def get_decay_poisson(d, span=10.0, hl_range=(3*(1.0/12.0), 3.0),
-                      time_step=1.0 / 365, name_tmpl='x{}'):
+def get_decay_poisson(N, span=5.0, hl_range=(3*(1.0/12.0), 3.0),
+                      time_step=1.0 / 365, name_tmpl='x_{}'):
     """Simulated decay of species with different decay rates
 
         - Xs: decay_rates in years
@@ -197,13 +243,13 @@ def get_decay_poisson(d, span=10.0, hl_range=(3*(1.0/12.0), 3.0),
         - http://129.173.120.78/~kreplak/wordpress/wp-content/uploads/2010/12/Phyc2150_2016_Lecture10.pdf
 
     """
-    assert d > 0
+    assert N > 0
 
     def half_life_to_decay_rate(half_lives, year_fraction):
         # decay rates as the fraction of the original number of atoms that decays per year_fraction
         return 1 - np.exp(- year_fraction * np.log(2) / np.asarray(half_lives))
 
-    def function(Xs, span, time_step):
+    def function(Xs, span=span, time_step=time_step):
         Xs = np.asarray(Xs)
         if Xs.ndim == 1:
             Xs = np.expand_dims(Xs, axis=0)
@@ -216,17 +262,17 @@ def get_decay_poisson(d, span=10.0, hl_range=(3*(1.0/12.0), 3.0),
         # rates = half_life_to_decay_rate(Xs, 1.0 / 365.0)
         rates = Xs
         n_steps = int(span / time_step)
-        for d in range(n_steps):
+        for n in range(n_steps):
             offsets = quantities[:, :n_products] * rates
             quantities[:, :n_products] -= offsets
             quantities[:, 1:] += offsets
 
         return quantities[:, -1]
 
-    decay_range = half_life_to_decay_rate(hl_range, time_step)[::-1]
-    axes = make_unif_axes(d, bounds=decay_range, name_tmpl=name_tmpl)
+    decay_range = tuple(half_life_to_decay_rate(hl_range, time_step)[::-1])
+    axes = [dict(name=name_tmpl.format(n), domain=decay_range) for n in range(N)]
 
-    return functools.partial(function, span=span, time_step=time_step), axes
+    return function, axes
 
 
 def get_borehole():
@@ -254,14 +300,14 @@ def get_borehole():
 
         return frac1 / frac2
 
-    axes = (('r_w', None, (0.05, 0.15), ('norm', 0.10, 0.0161812)),
-            ('r', None, (100, 50000), ('lognorm', 7.71, 1.0056)),
-            ('T_u', None, (63070, 115600), ('unif', None, None)),
-            ('H_u', None, (990, 1110), ('unif', None, None)),
-            ('T_l', None, (63.1, 116), ('unif', None, None)),
-            ('H_l', None, (700, 820), ('unif', None, None)),
-            ('L', None, (1120, 1680), ('unif', None, None)),
-            ('K_w', None, (9855, 12045), ('unif', None, None)))
+    axes = [dict(name='r_w', domain=(0.05, 0.15), dist=sp.stats.norm(loc=0.10, scale=0.0161812)),
+            dict(name='r', domain=(100, 50000), dist=sp.stats.lognorm(scale=np.exp(7.71), s=1.0056)),
+            dict(name='T_u', domain=(63070, 115600)),
+            dict(name='H_u', domain=(990, 1110)),
+            dict(name='T_l', domain=(63.1, 116)),
+            dict(name='H_l', domain=(700, 820)),
+            dict(name='L', domain=(1120, 1680)),
+            dict(name='K_w', domain=(9855, 12045))]
 
     return function, axes
 
@@ -297,13 +343,13 @@ def get_piston():
         C = 2 * np.pi * np.sqrt(fact1 / fact2)
         return C
 
-    axes = (('M', None, (30, 60), ('unif', None, None)),
-            ('S', None, (0.005, 0.020), ('unif', None, None)),
-            ('V_0', None, (0.002, 0.010), ('unif', None, None)),
-            ('k', None, (1000, 5000), ('unif', None, None)),
-            ('P_0', None, (90000, 110000), ('unif', None, None)),
-            ('T_a', None, (290, 296), ('unif', 290, 296)),
-            ('T_$', None, (340, 360), ('unif', None, None)))
+    axes = [dict(name='M', domain=(30, 60)),
+            dict(name='S', domain=(0.005, 0.020)),
+            dict(name='V_0', domain=(0.002, 0.010)),
+            dict(name='k', domain=(1000, 5000)),
+            dict(name='P_0', domain=(90000, 110000)),
+            dict(name='T_a', domain=(290, 296)),
+            dict(name='T_0', domain=(340, 360))]
 
     return function, axes
 
@@ -317,7 +363,7 @@ def get_dike(output='cost'):
     """
     assert output in ('H', 'overflow', 'cost')
 
-    def function(Xs, output):
+    def function(Xs, output=output):
         Q = Xs[:, 0]
         Ks = Xs[:, 1]
         Zv = Xs[:, 2]
@@ -337,18 +383,18 @@ def get_dike(output='cost'):
         elif output == 'cost':
             return (S > 0) + (S <= 0) * (0.2 + 0.8 * (1 - np.exp(-1000/S**4))) + 0.05*np.minimum(Hd, 8)
         else:
-            assert ValueError('Invalid output specification')
+            raise ValueError('Invalid output specification')
 
-    axes = (('Q', None, (500.0, 3000.0), ('gumbel', 1013.0, 558.0)),
-            ('K_s', None, (15.0, None), ('norm', 30.0, 8.0)),
-            ('Z_v', None, (49.0, 51.0), ('isotriang', None, None)),
-            ('Z_m', None, (54.0, 56.0), ('isotriang', None, None)),
-            ('H_d', None, (7.0, 9.0), ('unif', None, None)),
-            ('C_b', None, (55.0, 56.0), ('isotriang', None, None)),
-            ('L', None, (4990.0, 5010.0), ('isotriang', None, None)),
-            ('B', None, (295.0, 305.0), ('isotriang', None, None)))
+    axes = [dict(name='Q', domain=(500, 3000), dist=sp.stats.gumbel_r(1013.0, 558.0)),
+            dict(name='K_s', domain=(15.0, None), dist=sp.stats.norm(loc=30, scale=8)),
+            dict(name='Z_v', dist=sp.stats.triang(loc=49.0, scale=2, c=0.5)),
+            dict(name='Z_m', dist=sp.stats.triang(loc=54.0, scale=2, c=0.5)),
+            dict(name='H_d', dist=sp.stats.uniform(loc=7, scale=2)),
+            dict(name='C_b', dist=sp.stats.triang(loc=55.0, scale=1, c=0.5)),
+            dict(name='L', dist=sp.stats.triang(loc=4990.0, scale=20, c=0.5)),
+            dict(name='B', dist=sp.stats.triang(loc=295.0, scale=10, c=0.5))]
 
-    return functools.partial(function, output=output), axes
+    return function, axes
 
 
 def get_fire_spread(wind_factor=1.0):
@@ -427,16 +473,16 @@ def get_fire_spread(wind_factor=1.0):
 
         return results
 
-    axes = (('delta', None, None, ('lognorm', 2.19, 0.517)),
-            ('sigma', None, (3.0 / 0.6, None), ('lognorm', 3.31, 0.294)),
-            ('h', None, None, ('lognorm', 8.48, 0.063)),
-            ('rho_p', None, None, ('lognorm', -0.592, 0.219)),
-            ('m_l', None, (0.0, None), ('norm', 1.18, 0.377)),
-            ('m_d', None, None, ('norm', 0.19, 0.047)),
-            ('S_T', None, (0.0, None), ('norm', 0.049, 0.011)),
-            ('U', None, None, ('lognorm', 1.0174, 0.5569, wind_factor)),
-            ('tan_phi', None, (0.0, None), ('norm', 0.38, 0.186)),
-            ('P', None, (None, 1.0), ('lognorm', -2.19, 0.64)))
+    axes = [dict(name='delta', dist=sp.stats.lognorm(scale=np.exp(2.19), s=0.517)),
+            dict(name='sigma', domain=(3.0 / 0.6, None), dist=sp.stats.lognorm(scale=np.exp(3.31), s=0.294)),
+            dict(name='h', dist=sp.stats.lognorm(scale=np.exp(8.48), s=0.063)),
+            dict(name='rho_p', dist=sp.stats.lognorm(scale=np.exp(-0.592), s=0.219)),
+            dict(name='m_l', domain=(0, None), dist=sp.stats.norm(loc=1.18, scale=0.377)),
+            dict(name='m_d', dist=sp.stats.norm(loc=0.19, scale=0.047)),
+            dict(name='S_T', domain=(0, None), dist=sp.stats.norm(loc=0.049, scale=0.011)),
+            dict(name='U', dist=sp.stats.lognorm(scale=np.exp(1.0174)*wind_factor, s=0.5569)),
+            dict(name='tan_phi', domain=(0, None), dist=sp.stats.norm(loc=0.38, scale=0.186)),
+            dict(name='P', domain=(None, 1), dist=sp.stats.lognorm(scale=np.exp(-2.19), s=0.64))]
 
     return function, axes
 
@@ -455,20 +501,18 @@ def get_robot_arm():
     """
 
     def function(Xs):
-        # Xs = Xs[:, [0, 4, 1, 5, 2, 6, 3, 7]]
         u = np.sum(Xs[:, [1, 3, 5, 7]] * np.cos(np.cumsum(Xs[:, [0, 2, 4, 6]], axis=1)), axis=1)
         v = np.sum(Xs[:, [1, 3, 5, 7]] * np.sin(np.cumsum(Xs[:, [0, 2, 4, 6]], axis=1)), axis=1)
-        # print(Xs.shape, u.shape)
         return np.sqrt(u**2 + v**2)
 
-    axes = (('phi1', None, (0, 2 * np.pi), ('unif', None, None)),
-            ('L1', None, (0, 1), ('unif', None, None)),
-            ('phi2', None, (0, 2 * np.pi), ('unif', None, None)),
-            ('L2', None, (0, 1), ('unif', None, None)),
-            ('phi3', None, (0, 2 * np.pi), ('unif', None, None)),
-            ('L3', None, (0, 1), ('unif', None, None)),
-            ('phi4', None, (0, 2 * np.pi), ('unif', None, None)),
-            ('L4', None, (0, 1), ('unif', None, None)))
+    axes = [dict(name='phi1', domain=(0, 2*np.pi)),
+            dict(name='L1', domain=(0, 1)),
+            dict(name='phi2', domain=(0, 2*np.pi)),
+            dict(name='L2', domain=(0, 1)),
+            dict(name='phi3', domain=(0, 2*np.pi)),
+            dict(name='L3', domain=(0, 1)),
+            dict(name='phi4', domain=(0, 2*np.pi)),
+            dict(name='L4', domain=(0, 1))]
 
     return function, axes
 
@@ -489,16 +533,16 @@ def get_wing_weight():
         Xs[:, 3] *= 2*np.pi/360  # Original bounds for 'Lambda" are in degrees
         return 0.036 * Xs[:, 0]**0.758 * Xs[:, 1]**0.0035 * (Xs[:, 2] / np.cos(Xs[:, 3])**2)**0.6 * Xs[:, 4]**0.006 * Xs[:, 5]**0.04 * (100*Xs[:, 6] / np.cos(Xs[:, 3]))**-0.3 * (Xs[:, 7]*Xs[:, 8])**0.49 + Xs[:, 0]*Xs[:, 9]
 
-    axes = (('Sw', None, (150, 200), ('unif', None, None)),
-            ('Wfw', None, (220, 300), ('unif', None, None)),
-            ('A', None, (6, 10), ('unif', None, None)),
-            ('Lambda', None, (-10, 10), ('unif', None, None)),
-            ('q', None, (16, 45), ('unif', None, None)),
-            ('lambda', None, (0.5, 1), ('unif', None, None)),
-            ('tc', None, (0.08, 0.18), ('unif', None, None)),
-            ('Nz', None, (2.5, 6), ('unif', None, None)),
-            ('Wdg', None, (1700, 2500), ('unif', None, None)),
-            ('Wp', None, (0.025, 0.08), ('unif', None, None)))
+    axes = [dict(name='Sw', domain=(150, 200)),
+            dict(name='Wfw', domain=(220, 300)),
+            dict(name='A', domain=(6, 10)),
+            dict(name='Lambda', domain=(-10, 10)),
+            dict(name='q', domain=(16, 45)),
+            dict(name='lambda', domain=(0.5, 1)),
+            dict(name='tc', domain=(0.08, 0.18)),
+            dict(name='Nz', domain=(2.5, 6)),
+            dict(name='Wdg', domain=(1700, 2500)),
+            dict(name='Wp', domain=(0.025, 0.08))]
 
     return function, axes
 
@@ -508,7 +552,8 @@ def get_otl_circuit():
     
     References:
         - Ben-Ari, E. N., & Steinberg, D. M. (2007). Modeling data from computer
-            experiments: an empirical comparison of kriging with MARS and projection pursuit regression. Quality Engineering, 19(4), 327-338.
+            experiments: an empirical comparison of kriging with MARS and projection
+            pursuit regression. Quality Engineering, 19(4), 327-338.
         - Moon, H. (2010). Design and Analysis of Computer Experiments for
             Screening Input Variables (Doctoral dissertation, Ohio State University).
         - Moon, H., Dean, A. M., & Santner, T. J. (2012). Two-stage sensitivity-based
@@ -522,12 +567,12 @@ def get_otl_circuit():
         part3 = 0.74 * Xs[:, 2] * Xs[:, 5] * (Xs[:, 4] + 9) / ((Xs[:, 5] * (Xs[:, 4] + 9) + Xs[:, 2]) * Xs[:, 3])
         return part1 + part2 + part3
 
-    axes = (('Rb1', None, (50, 150), ('unif', None, None)),
-            ('Rb2', None, (25, 70), ('unif', None, None)),
-            ('Rf', None, (0.5, 3), ('unif', None, None)),
-            ('Rc1', None, (1.2, 2.5), ('unif', None, None)),
-            ('Rc2', None, (0.25, 1.2), ('unif', None, None)),
-            ('beta', None, (50, 300), ('unif', None, None)))
+    axes = [dict(name='Rb1', domain=(50, 150)),
+            dict(name='Rb2', domain=(25, 70)),
+            dict(name='Rf', domain=(0.5, 3)),
+            dict(name='Rc1', domain=(1.2, 2.5)),
+            dict(name='Rc2', domain=(0.25, 1.2)),
+            dict(name='beta', domain=(50, 300))]
 
     return function, axes
 
@@ -546,7 +591,7 @@ def get_welch_1992():
     def function(Xs):
         return Xs[:, 11] / (1 + Xs[:, 0]) + 5*(Xs[:, 3] - Xs[:, 19])**2 + Xs[:, 4] + 40*Xs[:, 18]**3 - 5*Xs[:, 18] + 0.05*Xs[:, 1] + 0.08*Xs[:, 4] - 0.03*Xs[:, 5] + 0.03*Xs[:, 6] - 0.09*Xs[:, 8] - 0.01*Xs[:, 9] - 0.07*Xs[:, 10] + 0.25*Xs[:, 12]**2 - 0.04*Xs[:, 13] + 0.06*Xs[:, 14] - 0.01*Xs[:, 16] - 0.03*Xs[:, 17]
 
-    axes = make_unif_axes(20, bounds=(-0.5, 0.5))
+    axes = [dict(domain=(-0.5, 0.5)) for n in range(20)]
 
     return function, axes
 
@@ -562,7 +607,7 @@ def get_dette_pepelyshev():
     def function(Xs):
         return 4*(Xs[:, 0] - 2 + 8*Xs[:, 1] - 8*Xs[:, 1]**2)**2 + (3 - 4*Xs[:, 1])**2 + 16*np.sqrt(Xs[:, 2] + 1)*(2*Xs[:, 2] - 1)**2
 
-    axes = make_unif_axes(3, bounds=(0, 1))
+    axes = [dict(domain=(0, 1)) for n in range(3)]
 
     return function, axes
 
@@ -585,21 +630,47 @@ def get_environmental_model():
         result[idx] += Xs[idx, 0] / np.sqrt(4*np.pi*Xs[idx, 1]*(Xs[idx, 5]-Xs[idx, 3])) * np.exp(-((Xs[idx, 4]-Xs[idx, 2])**2) / (4*Xs[idx, 1]*(Xs[idx, 5]-Xs[idx, 3])))
         return np.sqrt(4*np.pi) * result
 
-    axes = (('M', None, (7, 13), ('unif', None, None)),
-            ('D', None, (0.02, 0.12), ('unif', None, None)),
-            ('L', None, (0.01, 3), ('unif', None, None)),
-            ('tau', None, (30.01, 30.295), ('unif', None, None)),
-            ('s', None, (0, 3), ('unif', None, None)),
-            ('t', None, (0.3, 60), ('unif', None, None)))
+    axes = [dict(name='M', domain=(7, 13)),
+            dict(name='D', domain=(0.02, 0.12)),
+            dict(name='L', domain=(0.01, 3)),
+            dict(name='tau', domain=(30.01, 30.295)),
+            dict(name='s', domain=(0, 3)),
+            dict(name='t', domain=(0.3, 60))]
 
     return function, axes
 
 
 def get_hilbert(N, size):
+    """
+    The Hilbert tensor, defined as 1 / (x_1 + ... x_N). It is known to have high rank, but also to be extremely well approximated by low-rank tensors
+    """
 
     def function(Xs):
         return 1./np.sum(Xs, axis=1)
 
-    axes = make_unif_axes(N, bounds=[1, size])
+    axes = [dict(domain=(1, size)) for n in range(N)]
+
+    return function, axes
+
+
+def get_simple_beam_deflection():
+    """
+    A rank-1 function modeling the maximum deflection at the middle of a simply supported beam, as a function of the beam width b, its height h, its span L, Young's modulus E, and the uniform load p
+
+    Reference:
+        - K. Konakli, B. Sudret. "Low-Rank Tensor Approximations for Reliability Analysis" (2011), https://hal.archives-ouvertes.fr/hal-01169564/document
+    """
+
+    def function(Xs):
+        return Xs[:, 4] * Xs[:, 2]**3 / (4 * Xs[:, 3] * Xs[:, 0] * Xs[:, 1]**3)
+
+    def lognormal_with_given_moments(mean, variance):
+        return sp.stats.lognorm(scale=mean**2 / np.sqrt(variance + mean**2), s=np.sqrt(np.log(variance / mean**2 + 1)))
+
+    axes = [dict(name='b', dist=lognormal_with_given_moments(0.15, 0.0075**2)),
+            dict(name='h', dist=lognormal_with_given_moments(0.3, 0.015**2)),
+            dict(name='L', dist=lognormal_with_given_moments(5, 0.05**2)),
+            dict(name='E', dist=lognormal_with_given_moments(30000, 4500**2)),
+            dict(name='p', dist=lognormal_with_given_moments(10000, 2000**2))]
 
     return function, axes
