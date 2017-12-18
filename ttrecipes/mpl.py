@@ -324,23 +324,15 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
     fig = plt.figure()
     ax = []
     import matplotlib.gridspec as gridspec
-    if len(dims) <= 3:
+    if len(dims) <= 4:
         gs = gridspec.GridSpec(1, len(dims))
-    elif len(dims) == 4:
-        gs = gridspec.GridSpec(2, 2)
-    elif len(dims) == 5:
-        gs = gridspec.GridSpec(2, 6)
-        gs = [gs[0, 0:2], gs[0, 2:4], gs[0, 4:6], gs[1, 1:3], gs[1, 3:5]]
-    elif len(dims) == 6:
-        gs = gridspec.GridSpec(2, 3)
-    elif len(dims) == 7:
-        gs = gridspec.GridSpec(3, 3)
-        gs = [gs[0, 0], gs[0, 1], gs[0, 2]] + [gs[1, 0], gs[1, 1], gs[1, 2]] + [gs[2, 1]]
-    elif len(dims) == 8:
-        gs = gridspec.GridSpec(2, 4)
+    elif len(dims) % 2 == 0:
+        gs = gridspec.GridSpec(2, len(dims) // 2)
     else:
-        gs = gridspec.GridSpec(1, len(dims))  # TODO
-        # raise NotImplementedError
+        toprow = len(dims) // 2 + 1
+        bottomrow = len(dims) // 2
+        gs = gridspec.GridSpec(2, toprow*2)
+        gs = [gs[0, i*2:i*2+2] for i in range(toprow)] + [gs[1, i*2+1:i*2+3] for i in range(bottomrow)]
 
     # gs.update()
     for i in range(len(dims)):
@@ -352,7 +344,7 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
             # ax[-1].disable_mouse_rotation()
             plt.locator_params(nbins=6)
         else:
-            raise AttributeError
+            raise ValueError("Supported diagrams: 'plot', 'image', and 'surface' (experimental)")
             # ax.append(plt.subplot(gs[i]))
     # fig.tight_layout()
     lines = {}
