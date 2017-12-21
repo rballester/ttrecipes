@@ -415,6 +415,17 @@ def squeeze(t):
     return tt.vector.from_list(newcores)
 
 
+def full(t):
+    """
+    NumPy's einsum() does quite a good job at TT reconstruction, especially for bigger tensors
+    """
+
+    if t.d > 26:
+        return t.full()
+    str = ','.join([chr(ord('a') + n) + chr(ord('A') + n) + chr(ord('a') + n + 1) for n in range(t.d)])
+    return np.einsum(str, *tt.vector.to_list(t), optimize=True)[..., 0, 0]
+
+
 def choose(t, modes):
     """
     Dimensions in :param modes: get evaluated at their second index; dimensions not in :param modes: at their first
