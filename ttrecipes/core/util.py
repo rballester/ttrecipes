@@ -701,6 +701,7 @@ def shift_mode(t, n, shift, eps='same'):
     N = t.d
     assert n - shift >= 0
     assert n + shift < N
+
     if shift == 0:
         return copy.deepcopy(t)
     cores = tt.vector.to_list(t)
