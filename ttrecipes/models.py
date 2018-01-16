@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Sample functions for surrogate modeling and sensitivity analysis.
-
-This module contains different examples of multidimensional functions that may
-work as sensible examples for real-world models.
-
+"""
+Sample functions for surrogate modeling and sensitivity analysis.
 """
 
 # -----------------------------------------------------------------------------
@@ -708,9 +705,9 @@ def get_damped_oscillator(p=3):
         omega_a = (omega_p+omega_s) / 2  # Average natural frequency
         zeta_a = (zeta_p+zeta_s) / 2  # Average damping ratio
         theta = (omega_p-omega_s) / omega_a  # Tuning parameter
-        meanSquareRelativeDisplacement = np.pi*S_0 / (4*zeta_s*omega_s**3) *  zeta_a * zeta_s / (zeta_p * zeta_s * (4*zeta_a**2+theta**2) + gamma * zeta_a**2) * (zeta_p * omega_p**3 + zeta_s * omega_s**3) * omega_p / (4 * zeta_a * omega_a**4)  # Mean-square relative displacement
+        msrd = np.pi*S_0 / (4*zeta_s*omega_s**3) * zeta_a * zeta_s / (zeta_p * zeta_s * (4*zeta_a**2+theta**2) + gamma * zeta_a**2) * (zeta_p * omega_p**3 + zeta_s * omega_s**3) * omega_p / (4 * zeta_a * omega_a**4)  # Mean-square relative displacement
 
-        return F_s - p*k_s*np.sqrt(meanSquareRelativeDisplacement)  # Peak force in the secondary spring
+        return F_s - p*k_s*np.sqrt(msrd)  # Peak force in the secondary spring
 
     axes = [dict(name='m_p', dist=lognormal_with_given_moments(1.5, 0.15**2)),
             dict(name='m_s', dist=lognormal_with_given_moments(0.01, 0.001**2)),

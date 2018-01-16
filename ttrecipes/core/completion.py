@@ -166,11 +166,21 @@ def categorical_ALS(Xs, ys, ws=None, shape=None, x0=None, ranks=1, nswp=10, verb
     return tt.vector.from_list(cores)
 
 
-def pce_interpolation(Xs, ys, ws=None, shape=None, x0=None, ranks=None, ranks2=None, maxswp=50, tol=1e-3, verbose=False):
+def pce_interpolation(Xs, ys, ws=None, shape=None, x0=None, ranks=None, ranks2=None, maxswp=50, solver='sparse',
+                      tol=1e-3,
+                      verbose=False):
     """
     TT completion for smooth variables: each core is sought within the subspace spanned by a few leading orthogonal polynomials (polynomial chaos expansion, PCE). This is equivalent to fixing the bases in the "extended tensor train" format (ETT), first used in I. Oseledets, "Tensor-train decomposition" (2011). See also: Bigoni et al., "Spectral tensor-train decomposition" (2014), a version that uses cross-approximation, unlike completion as this function does.
 
+    :param Xs: a P x N matrix
+    :param ys: a vector with P elements
+    :param ws: a vector with P elements, with the weight of each sample (if None, 1 is assumed)
+    :param shape: list of N integers. If None, the smallest shape that accommodates `Xs` will be chosen
+    :param x0: initial solution (a TT tensor). If None, a random tensor will be used
     :param ranks2: integer or list of integers, default is None. Core ranks along the spatial dimension; i.e. the size of the truncated basis
+    :param maxswp:
+    :param solver: 'sparse' (default) or 'dense'. The latter is faster for small problems
+    :param tol: terminate when the relative error improves by less than this proportion. Default is 1e-3
 
     """
 
@@ -212,7 +222,7 @@ def pce_interpolation(Xs, ys, ws=None, shape=None, x0=None, ranks=None, ranks2=N
 
     def optimize_core(cores, mu, direction):
 
-        if True:
+        if solver == 'sparse':
             Rl = cores[mu].shape[0]
             S = ranks2[mu]
             Rr = cores[mu].shape[2]

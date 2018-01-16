@@ -24,10 +24,10 @@ def truncated_svd(M, delta=None, eps=None, rmax=None, left_ortho=True, verbose=F
     Decompose a matrix M (size (m x n) in two factors U and V (sizes m x r and r x n)
 
     :param M: a matrix
-    :param delta: if provided
-    :param eps:
-    :param rmax:
-    :param left_ortho:
+    :param delta: if provided, maximum error norm
+    :param eps: if provided, maximum relative error
+    :param rmax: optionally, maximum r
+    :param left_ortho: if True (default), U will be orthonormal. If False, V will
     :param verbose:
     :return: U, V
 
