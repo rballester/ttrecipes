@@ -10,11 +10,6 @@
 - Global variance-based sensitivity analysis and Sobol indices
 - Mask tensors and TTs that generalize deterministic finite automata
 
-## Dependencies
-
-- NumPy
-- [ttpy](https://github.com/oseledets/ttpy)
-
 ## Installation
 
 The current version of the _ttpy_ toolbox in PyPI has some incompatibilities with _TT recipes_. The provided _requirements.txt_ and _environment.yml_ files install a compatible version from the _ttpy_ [repository](https://github.com/oseledets/ttpy). The recommended way to install _TT recipes_ and its dependencies is:
@@ -43,6 +38,21 @@ You can also run and interact with the notebook online using Binder or Microsoft
 
 [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
 [![Azure Notebooks](https://notebooks.azure.com/launch.png)](https://notebooks.azure.com/egparedes/libraries/ttrecipes/html/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb)
+
+## Project Structure
+
+- There is a ```core``` folder containing all low-level utilities to work with TTs. They are all imported with a horizontal structure:
+
+```
+import ttrecipes as tr
+tr.core.anyfunction()
+```
+
+- Higher-level functions are grouped as modules that have to be imported explicitly. Currently, there are:
+    - ```mpl.py```: TT visualization using *matplotlib*
+    - ```tikz.py```: TT visualization using *TikZ*
+    - ```models.py```: a library of analytical functions for surrogate modeling, sensitivity analysis, etc.
+    - ```sensitivity_analysis.py```: high-level querying of Sobol indices, displaying and tabulating Sobol and other sensitivity metrics, etc.
 
 ## References
 
