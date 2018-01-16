@@ -653,6 +653,10 @@ def get_hilbert(N, size):
     return function, axes
 
 
+def lognormal_with_given_moments(mean, variance):
+    return sp.stats.lognorm(scale=mean**2 / np.sqrt(variance + mean**2), s=np.sqrt(np.log(variance / mean**2 + 1)))
+
+
 def get_simple_beam_deflection():
     """
     A rank-1 function modeling the maximum deflection at the middle of a simply supported beam, as a function of the beam width b, its height h, its span L, Young's modulus E, and the uniform load p
@@ -664,13 +668,57 @@ def get_simple_beam_deflection():
     def function(Xs):
         return Xs[:, 4] * Xs[:, 2]**3 / (4 * Xs[:, 3] * Xs[:, 0] * Xs[:, 1]**3)
 
-    def lognormal_with_given_moments(mean, variance):
-        return sp.stats.lognorm(scale=mean**2 / np.sqrt(variance + mean**2), s=np.sqrt(np.log(variance / mean**2 + 1)))
-
     axes = [dict(name='b', dist=lognormal_with_given_moments(0.15, 0.0075**2)),
             dict(name='h', dist=lognormal_with_given_moments(0.3, 0.015**2)),
             dict(name='L', dist=lognormal_with_given_moments(5, 0.05**2)),
             dict(name='E', dist=lognormal_with_given_moments(30000, 4500**2)),
             dict(name='p', dist=lognormal_with_given_moments(10000, 2000**2))]
+
+    return function, axes
+
+
+def get_damped_oscillator(p=3):
+    """
+    Dubourg's oscillator function for 2 masses; it has 8 independent lognormal variables as inputs plus the peak
+    factor p. The output is the peak force in the secondary spring
+
+    References:
+
+    - "Metamodel-based importance sampling for structural reliability analysis", by Dubourg et al. (2013)
+    - "Uncertainty Propagation of P-Boxes Using Sparse Polynomial Chaos Expansions", by Schoebi and Sudret (2016)
+
+    """
+
+    def function(Xs):
+
+        # Input variables
+        m_p = Xs[:, 0]  # Mass 1
+        m_s = Xs[:, 1]  # Mass 2
+        k_p = Xs[:, 2]  # Stiffness (spring 1)
+        k_s = Xs[:, 3]  # Stiffness (spring 2)
+        zeta_p = Xs[:, 4]  # Damping ratio (damper 1)
+        zeta_s = Xs[:, 5]  # Damping ratio (damper 2)
+        S_0 = Xs[:, 6]  # White noise excitation
+        F_s = Xs[:, 7]  # Force capacity (spring 2)
+
+        # Intermediate variables
+        omega_p = np.sqrt(k_p / m_p)  # Natural frequency (spring 1)
+        omega_s = np.sqrt(k_s / m_s)  # Natural frequency (spring 2)
+        gamma = m_s / m_p  # Relative mass
+        omega_a = (omega_p+omega_s) / 2  # Average natural frequency
+        zeta_a = (zeta_p+zeta_s) / 2  # Average damping ratio
+        theta = (omega_p-omega_s) / omega_a  # Tuning parameter
+        meanSquareRelativeDisplacement = np.pi*S_0 / (4*zeta_s*omega_s**3) *  zeta_a * zeta_s / (zeta_p * zeta_s * (4*zeta_a**2+theta**2) + gamma * zeta_a**2) * (zeta_p * omega_p**3 + zeta_s * omega_s**3) * omega_p / (4 * zeta_a * omega_a**4)  # Mean-square relative displacement
+
+        return F_s - p*k_s*np.sqrt(meanSquareRelativeDisplacement)  # Peak force in the secondary spring
+
+    axes = [dict(name='m_p', dist=lognormal_with_given_moments(1.5, 0.15**2)),
+            dict(name='m_s', dist=lognormal_with_given_moments(0.01, 0.001**2)),
+            dict(name='k_p', dist=lognormal_with_given_moments(1, 0.2**2)),
+            dict(name='k_s', dist=lognormal_with_given_moments(0.01, 0.002**2)),
+            dict(name='z_p', dist=lognormal_with_given_moments(0.05, 0.02**2)),
+            dict(name='z_s', dist=lognormal_with_given_moments(0.02, 0.01**2)),
+            dict(name='S_0', dist=lognormal_with_given_moments(100, 10**2)),
+            dict(name='F_s', dist=lognormal_with_given_moments(15, 1.5**2))]
 
     return function, axes

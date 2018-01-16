@@ -15,6 +15,7 @@ from __future__ import (absolute_import, division,
 from future.builtins import range
 
 import numpy as np
+import copy
 import tt
 import scipy.interpolate
 import scipy.fftpack
@@ -415,7 +416,7 @@ def squeeze(t):
     return tt.vector.from_list(newcores)
 
 
-def full(t):
+def full(t, keep_end_ranks=False):
     """
     NumPy's einsum() does quite a good job at TT reconstruction, especially for bigger tensors
     """
@@ -423,7 +424,14 @@ def full(t):
     if t.d > 26:
         return t.full()
     str = ','.join([chr(ord('a') + n) + chr(ord('A') + n) + chr(ord('a') + n + 1) for n in range(t.d)])
-    return np.einsum(str, *tt.vector.to_list(t), optimize=True)[..., 0, 0]
+    str += '->' + 'a' + ''.join([chr(ord('A') + n) for n in range(t.d)]) + chr(ord('a') + t.d)
+    result = np.einsum(str, *tt.vector.to_list(t), optimize=True)
+    if not keep_end_ranks:
+        if t.r[0] == 1:
+            result = result[0, ...]
+        if t.r[-1] == 1:
+            result = result[..., 0]
+    return result
 
 
 def choose(t, modes):
@@ -689,13 +697,11 @@ def derive(t, modes=None, order=1):
 def shift_mode(t, n, shift, eps='same'):
     """
     Shift a mode back or forth within a TT
-
     :param t:
     :param n: which mode to move
     :param shift: how many positions to move. If positive move right, if negative move left
     :param eps: prescribed relative error tolerance. If 'same' (default), ranks will be kept no larger than the original
     :return: the transposed tensor
-
     """
 
     N = t.d
@@ -731,4 +737,39 @@ def shift_mode(t, n, shift, eps='same'):
         newR2 = left.shape[1]
         cores[c1] = np.reshape(left, [R1, I2, newR2])
         cores[c2] = np.reshape(right, [newR2, I1, R3])
+    return tt.vector.from_list(cores)
+
+
+def concatenate(t1, t2, n):
+    """
+    Given two TT tensors, stack them along a specified dimension n
+    """
+
+    N = t1.d
+    if t2.d != N:
+        raise ValueError('For concatenation, both tensors must have the same dimensionality')
+    check = list(range(N))
+    del check[n]
+    if not all(t1.n[check] == t2.n[check]):
+        raise ValueError('For concatenation, both tensors must have equal sizes along all (but one) modes')
+
+    cores1 = tt.vector.to_list(t1)
+    cores2 = tt.vector.to_list(t2)
+    cores = []
+    for mu in range(N):
+        if mu != n:
+            core = np.zeros([cores1[mu].shape[0] + cores2[mu].shape[0], cores1[mu].shape[1], cores1[mu].shape[2] +
+                             cores2[mu].shape[2]])
+            core[:cores1[mu].shape[0], :, :cores1[mu].shape[2]] = cores1[mu]
+            core[cores1[mu].shape[0]:, :, cores1[mu].shape[2]:] = cores2[mu]
+        else:
+            core = np.zeros([cores1[mu].shape[0] + cores2[mu].shape[0], cores1[mu].shape[1] + cores2[mu].shape[1],
+                             cores1[mu].shape[2] + cores2[mu].shape[2]])
+            core[:cores1[mu].shape[0], :cores1[mu].shape[1], :cores1[mu].shape[2]] = cores1[mu]
+            core[cores1[mu].shape[0]:, cores1[mu].shape[1]:, cores1[mu].shape[2]:] = cores2[mu]
+        if mu == 0:
+            core = np.sum(core, axis=0, keepdims=True)
+        elif mu == N-1:
+            core = np.sum(core, axis=2, keepdims=True)
+        cores.append(core)
     return tt.vector.from_list(cores)

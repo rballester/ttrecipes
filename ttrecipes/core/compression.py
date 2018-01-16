@@ -19,8 +19,28 @@ import time
 import ttrecipes as tr
 
 
-def mysvd(M, delta, rmax, left_ortho=True, verbose=False):
+def truncated_svd(M, delta=None, eps=None, rmax=None, left_ortho=True, verbose=False):
+    """
+    Decompose a matrix M (size (m x n) in two factors U and V (sizes m x r and r x n)
 
+    :param M: a matrix
+    :param delta: if provided
+    :param eps:
+    :param rmax:
+    :param left_ortho:
+    :param verbose:
+    :return: U, V
+
+    """
+
+    if delta is not None and eps is not None:
+        raise ValueError('Provide either `delta` or `eps`')
+    if delta is None and eps is not None:
+        delta = eps*np.linalg.norm(M)
+    if delta is None and eps is None:
+        delta = 0
+    if rmax is None:
+        rmax = np.iinfo(np.int32).max
     assert rmax >= 1
 
     start = time.time()
@@ -96,7 +116,7 @@ def tt_svd(X, eps, rmax=np.iinfo(np.int32).max, verbose=False):
     shape = X.shape
     M = np.reshape(X.astype(float), [shape[0], -1])
     for n in range(1, N):
-        left, M = mysvd(M, delta=delta, rmax=rmax, verbose=verbose)
+        left, M = truncated_svd(M, delta=delta, rmax=rmax, verbose=verbose)
         M = np.reshape(M, (M.shape[0] * shape[n], M.shape[1] // shape[n]))
         cores.append(np.reshape(left, [left.shape[0] // shape[n - 1], shape[n - 1], left.shape[1]]))
     cores.append(np.reshape(M, [M.shape[0] // shape[N - 1], shape[N - 1], 1]))
@@ -114,7 +134,7 @@ def round(t, eps, rmax=np.iinfo(np.int32).max, verbose=False):
     delta = eps / np.sqrt(N - 1) * np.linalg.norm(cores[-1])
     for mu in range(N-1, 0, -1):
         M = tr.core.right_unfolding(cores[mu])
-        left, M = mysvd(M, delta=delta, rmax=rmax, left_ortho=False, verbose=verbose)
+        left, M = truncated_svd(M, delta=delta, rmax=rmax, left_ortho=False, verbose=verbose)
         cores[mu] = np.reshape(M, [-1, shape[mu], cores[mu].shape[2]], order='F')
         cores[mu-1] = np.einsum('ijk,kl', cores[mu-1], left, optimize=True)
     return tt.vector.from_list(cores)

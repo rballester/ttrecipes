@@ -10,7 +10,6 @@ from __future__ import (absolute_import, division,
 from unittest import TestCase
 import numpy as np
 import tt
-np.random.seed(0)
 import ttrecipes as tr
 
 
@@ -48,3 +47,16 @@ class TestUtil(TestCase):
                 del idx2_copy[axes[1]]
                 reco = reco[idx1 + idx2_copy]
                 self.assertAlmostEqual(np.linalg.norm(reco - gt) / np.linalg.norm(gt), 0)
+
+    def test_concatenate(self):
+        N = np.random.randint(4, 10)
+        n = np.random.randint(N)
+        Is1 = [4]*N
+        Is2 = [4]*N
+        Is2[n] = 6
+        Rs = [1] + [3]*(N-1) + [1]
+        t1 = tr.core.random_tt(shape=Is1, ranks=Rs)
+        t2 = tr.core.random_tt(shape=Is2, ranks=Rs)
+        t = tr.core.concatenate(t1, t2, n=n)
+        self.assertAlmostEqual(tt.vector.norm(t1 - t[[slice(None)]*n + [slice(Is1[n])] + [slice(None)]*(N-n-1)]), 0)
+        self.assertAlmostEqual(tt.vector.norm(t2 - t[[slice(None)]*n + [slice(Is1[n], None)] + [slice(None)]*(N-n-1)]), 0)
