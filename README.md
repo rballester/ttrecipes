@@ -3,10 +3,11 @@
 *TT recipes* are routines for [tensor train](http://epubs.siam.org/doi/abs/10.1137/090752286) analysis, optimization and visualization via careful manipulation of the TT cores. We make heavy use of many key possibilities offered by the TT model (many are provided by the great [ttpy toolbox](https://github.com/oseledets/ttpy)):
 
 - Compressing/decompressing full and sparse tensors
-- Elementary operations: sums and products of tensors, stacking, transposing, etc.
+- Elementary operations for tensors: stacking, transposing, etc.
 - Recompressing existing tensors (TT-round algorithm)
 - [Cross-approximation](http://www.mat.uniroma2.it/~tvmsscho/papers/Tyrtyshnikov5.pdf) wrapper for surrogate modeling
 - Completion and regression (alternating least squares)
+- Sampling schemes for parameter spaces
 - Variance-based sensitivity analysis: Sobol indices, Shapley values, effective dimensions, etc.
 - Mask tensors and TTs that generalize deterministic finite automata
 - Visualization of TT tensors (also interactive)
