@@ -62,8 +62,7 @@ def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samp
         """
         Map integer indices (tensor entries) to coordinates via a given ticks_list
 
-        :param indices: a P x N matrix of integers with ndim columns
-        :param ticks_list:
+        :param Xs: a P x N matrix of integers with ndim columns
         :return coordinates: a P x N matrix
 
         """

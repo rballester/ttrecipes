@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 Sample functions for surrogate modeling and sensitivity analysis.
+
+In most cases we report the function's sensitivity metrics extracted as:
+
+```
+import ttrecipes as tr
+
+function, axes = tr.models.get_modelname()
+tr.sensitivity_analysis.var_metrics(function, axes)
+```
 """
 
 # -----------------------------------------------------------------------------
@@ -133,7 +142,29 @@ def get_ishigami(a=7, b=0.1, name_tmpl='x_{}'):
             In Uncertainty Modeling and Analysis, 1990. Proceedings.,
             First International Symposium on (pp. 398-403). IEEE.
 
+            ** SENSITIVITY INDICES **
+    Variable        Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  ---------  --------  ---------  -----------------
+    x_0          0.313925  0.557366   0.435645           0.435645
+    x_1          0.442634  0.442634   0.442634           0.442634
+    x_2          0.000000  0.243441   0.121720           0.121720
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.756559           0.756559
+          2         0.243441           1.000000
+
+            ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -------------
+    Mean dimension             1.243441
+    Effective (superposition)  2.000000         1.000000
+    Effective (successive)     3.000000         1.000000
+    Effective (truncation)     3.000000         1.000000  x_0, x_1, x_2
+
     """
+
     def function(Xs, a=a, b=b):
         assert Xs.shape[1] == 3
         return np.sin(Xs[:, 0]) + a * np.sin(Xs[:, 1])**2 + b * (Xs[:, 2]**4) * np.sin(Xs[:, 0])
@@ -279,7 +310,37 @@ def get_borehole():
         - http://www.sfu.ca/~ssurjano/borehole.html
         - https://tel.archives-ouvertes.fr/tel-01143694/document (p. 84)
 
+             ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    r_w         0.659434  0.689659   0.674489           0.674460
+    r           0.000002  0.000003   0.000002           0.000002
+    T_u         0.000000  0.000000   0.000000           0.000000
+    H_u         0.096265  0.107466   0.101838           0.101825
+    T_l         0.000006  0.000008   0.000007           0.000007
+    H_l         0.096265  0.107466   0.101838           0.101825
+    L           0.091975  0.104098   0.097988           0.097963
+    K_w         0.022259  0.025449   0.023837           0.023829
+
+         ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.966205           0.966205
+          2         0.033441           0.999646
+          3         0.000353           0.999999
+          4         0.000001           1.000000
+          5         0.000000           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  ----------------
+    Mean dimension             1.034149
+    Effective (superposition)  1.000000         0.966205
+    Effective (successive)     1.000000         0.966205
+    Effective (truncation)     4.000000         0.974540  r_w, H_u, H_l, L
+
     """
+
     def function(Xs):
         rw = Xs[:, 0]
         r = Xs[:, 1]
@@ -315,7 +376,35 @@ def get_piston():
     References:
         - http://www.sfu.ca/~ssurjano/piston.html
 
+             ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    M           0.039118  0.050628   0.044690           0.044598
+    S           0.557301  0.599225   0.576625           0.575805
+    V_0         0.321154  0.352602   0.335269           0.334465
+    k           0.020614  0.066660   0.042092           0.041319
+    P_0         0.001237  0.001324   0.001274           0.001271
+    T_a         0.000003  0.000008   0.000006           0.000006
+    T_0         0.000026  0.000066   0.000045           0.000044
+
+         ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.939453           0.939453
+          2         0.050614           0.990066
+          3         0.009902           0.999968
+          4         0.000032           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  ------------
+    Mean dimension             1.070513
+    Effective (superposition)  2.000000         0.990066
+    Effective (successive)     2.000000         0.960821
+    Effective (truncation)     4.000000         0.998602  M, S, V_0, k
+
     """
+
     def function(Xs):
         M = Xs[:, 0]
         S = Xs[:, 1]
@@ -357,7 +446,37 @@ def get_dike(output='cost'):
     References:
         - http://statweb.stanford.edu/~owen/pubtalks/siamUQ.pdf, page 30
 
+             ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    Q           0.380565  0.512742   0.444096           0.442818
+    K_s         0.167290  0.268184   0.215444           0.214298
+    Z_v         0.179477  0.237146   0.206648           0.205817
+    Z_m         0.004123  0.008207   0.005968           0.005870
+    H_d         0.062146  0.122725   0.090833           0.090032
+    C_b         0.032133  0.042160   0.036857           0.036713
+    L           0.000000  0.000001   0.000001           0.000001
+    B           0.000106  0.000207   0.000151           0.000149
+
+         ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.825840           0.825840
+          2         0.157686           0.983526
+          3         0.015742           0.999268
+          4         0.000725           0.999993
+          5         0.000007           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  ---------------------
+    Mean dimension             1.191372
+    Effective (superposition)  2.000000         0.983526
+    Effective (successive)     4.000000         0.960343
+    Effective (truncation)     5.000000         0.991585  Q, K_s, Z_v, H_d, C_b
+
     """
+
     assert output in ('H', 'overflow', 'cost')
 
     def function(Xs, output=output):
@@ -417,7 +536,40 @@ def get_fire_spread(wind_factor=1.0):
             sensitivity analysis: Theory and computation, SIAM/ASA Journal of
             Uncertainty Quantification, 4, 1060–1083.
 
+             ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    delta       0.147682  0.365639   0.247308           0.242636
+    sigma       0.009722  0.038442   0.021836           0.020716
+    h           0.001795  0.005743   0.003508           0.003379
+    rho_p       0.005386  0.026633   0.014262           0.013390
+    m_l         0.208320  0.383794   0.289394           0.286066
+    m_d         0.139058  0.286946   0.206347           0.203024
+    S_T         0.001562  0.004998   0.003053           0.002940
+    U           0.036260  0.104798   0.066792           0.064926
+    tan_phi     0.045218  0.125940   0.081356           0.079247
+    P           0.042625  0.094803   0.066142           0.064858
+
+         ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.637628           0.637628
+          2         0.294176           0.931804
+          3         0.061395           0.993199
+          4         0.006443           0.999642
+          5         0.000347           0.999990
+          6         0.000010           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -------------------------------------
+    Mean dimension             1.437736
+    Effective (superposition)  3.000000         0.993199
+    Effective (successive)     9.000000         0.976128
+    Effective (truncation)     7.000000         0.962842  delta, sigma, m_l, m_d, U, tan_phi, P
+
     """
+
     def function(Xs):
         w0 = 1 / (1 + np.exp((15 - Xs[:, 0]) / 2)) / 4.8824
         # w0 = 0.95/(1+2.43*exp((15-X[1])*0.33))**(1/2.26) /4.8824
@@ -495,6 +647,38 @@ def get_robot_arm():
 
     References:
         - An, J., & Owen, A. (2001). Quasi-regression. Journal of Complexity, 17(4), 588-607.
+
+             ** SENSITIVITY INDICES **
+    Variable       Sobol      Total    Shapley    Banzhaf-Coleman
+    ----------  --------  ---------  ---------  -----------------
+    phi1        0.000000   0.000000   0.000000           0.000000
+    L1          0.050800   0.149860   0.084483           0.076672
+    phi2        0.072274   0.401519   0.196556           0.176517
+    L2          0.049909   0.148474   0.089201           0.084242
+    phi3        0.077015   0.536635   0.256871           0.232026
+    L3          0.050284   0.148362   0.089475           0.084586
+    phi4        0.073504   0.405552   0.199067           0.178966
+    L4          0.050026   0.150884   0.084347           0.076403
+
+         ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.423812           0.423812
+          2         0.298511           0.722323
+          3         0.200763           0.923086
+          4         0.066868           0.989954
+          5         0.009598           0.999552
+          6         0.000433           0.999985
+          7         0.000015           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  --------------------------------
+    Mean dimension             1.941287
+    Effective (superposition)  4.000000         0.989954
+    Effective (successive)     6.000000         0.988964
+    Effective (truncation)     7.000000         1.000000  L1, phi2, L2, phi3, L3, phi4, L4
+
     """
 
     def function(Xs):
@@ -524,6 +708,36 @@ def get_wing_weight():
             Screening Input Variables (Doctoral dissertation, Ohio State University).
         - Moon, H., Dean, A. M., & Santner, T. J. (2012). Two-stage sensitivity-based
             group screening in computer experiments. Technometrics, 54(4), 376-387.
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    Sw          0.124474  0.127901   0.126182           0.126179
+    Wfw         0.000003  0.000003   0.000003           0.000003
+    A           0.220242  0.226013   0.223120           0.223116
+    Lambda      0.000490  0.000506   0.000498           0.000498
+    q           0.000088  0.000091   0.000090           0.000090
+    lambda      0.001810  0.001871   0.001840           0.001840
+    tc          0.140980  0.145068   0.143017           0.143014
+    Nz          0.411610  0.419647   0.415619           0.415615
+    Wdg         0.084968  0.087601   0.086280           0.086278
+    Wp          0.003339  0.003362   0.003351           0.003351
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.988004           0.988004
+          2         0.011928           0.999932
+          3         0.000068           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  ------------------
+    Mean dimension             1.012063
+    Effective (superposition)  1.000000         0.988004
+    Effective (successive)     1.000000         0.988004
+    Effective (truncation)     5.000000         0.994166  Sw, A, tc, Nz, Wdg
+
     """
 
     def function(Xs):
@@ -555,6 +769,32 @@ def get_otl_circuit():
             Screening Input Variables (Doctoral dissertation, Ohio State University).
         - Moon, H., Dean, A. M., & Santner, T. J. (2012). Two-stage sensitivity-based
             group screening in computer experiments. Technometrics, 54(4), 376-387.
+
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    Rb1         0.495655  0.500136   0.497895           0.497895
+    Rb2         0.407205  0.411687   0.409446           0.409446
+    Rf          0.070842  0.074007   0.072425           0.072425
+    Rc1         0.018639  0.021802   0.020220           0.020220
+    Rc2         0.000000  0.000000   0.000000           0.000000
+    beta        0.000013  0.000015   0.000014           0.000014
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.992354           0.992354
+          2         0.007646           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  ------------
+    Mean dimension             1.007647
+    Effective (superposition)  1.000000         0.992354
+    Effective (successive)     1.000000         0.992354
+    Effective (truncation)     3.000000         0.978183  Rb1, Rb2, Rf
+
     """
 
     def function(Xs):
@@ -583,6 +823,45 @@ def get_welch_1992():
             projection pursuit regression. Quality Engineering, 19(4), 327-338.
         - Welch, W. J., Buck, R. J., Sacks, J., Wynn, H. P., Mitchell, T. J., & Morris, M. D. (1992).
             Screening, predicting, and computer experiments. Technometrics, 34(1), 15-25.
+
+             ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    x_0         0.000000  0.005734   0.002867           0.002867
+    x_1         0.000113  0.000113   0.000113           0.000113
+    x_2         0.000000  0.000000   0.000000           0.000000
+    x_3         0.075599  0.453707   0.264653           0.264653
+    x_4         0.052928  0.052928   0.052928           0.052928
+    x_5         0.000041  0.000041   0.000041           0.000041
+    x_6         0.000041  0.000041   0.000041           0.000041
+    x_7         0.000000  0.000000   0.000000           0.000000
+    x_8         0.000368  0.000368   0.000368           0.000368
+    x_9         0.000005  0.000005   0.000005           0.000005
+    x_10        0.000222  0.000222   0.000222           0.000222
+    x_11        0.054767  0.060500   0.057634           0.057634
+    x_12        0.000189  0.000189   0.000189           0.000189
+    x_13        0.000073  0.000073   0.000073           0.000073
+    x_14        0.000163  0.000163   0.000163           0.000163
+    x_15        0.000000  0.000000   0.000000           0.000000
+    x_16        0.000005  0.000005   0.000005           0.000005
+    x_17        0.000041  0.000041   0.000041           0.000041
+    x_18        0.356006  0.356006   0.356006           0.356006
+    x_19        0.075599  0.453707   0.264653           0.264653
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.616159           0.616159
+          2         0.383841           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric               Value    Rel. Variance  Variables
+    -------------------------  ---------  ---------------  --------------------------
+    Mean dimension              1.383841
+    Effective (superposition)   2.000000         1.000000
+    Effective (successive)     17.000000         1.000000
+    Effective (truncation)      5.000000         0.993007  x_3, x_4, x_11, x_18, x_19
+
     """
 
     def function(Xs):
@@ -599,6 +878,28 @@ def get_dette_pepelyshev():
     References:
         - Dette, H., & Pepelyshev, A. (2010). Generalized Latin hypercube
             design for computer experiments. Technometrics, 52(4).
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    x_0         0.004541  0.040873   0.022707           0.022707
+    x_1         0.291170  0.327502   0.309336           0.309336
+    x_2         0.667958  0.667958   0.667958           0.667958
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.963668           0.963668
+          2         0.036332           1.000000
+
+            ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -----------
+    Mean dimension             1.036332
+    Effective (superposition)  1.000000         0.963668
+    Effective (successive)     1.000000         0.963668
+    Effective (truncation)     2.000000         0.959127  x_1, x_2
+
     """
 
     def function(Xs):
@@ -619,6 +920,36 @@ def get_environmental_model():
             Bayesian calibration and uncertainty analysis for computationally
             expensive models using optimization and radial basis function approximation.
             Journal of Computational and Graphical Statistics, 17(2).
+
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    M           0.050135  0.077798   0.060672           0.059034
+    D           0.012723  0.084168   0.038813           0.034006
+    L           0.004704  0.355360   0.131566           0.107343
+    tau         0.000001  0.002237   0.000558           0.000280
+    s           0.124481  0.641080   0.331417           0.305744
+    t           0.267264  0.705564   0.436973           0.412262
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.459308           0.459308
+          2         0.247523           0.706831
+          3         0.261584           0.968416
+          4         0.030825           0.999241
+          5         0.000757           0.999998
+          6         0.000002           1.000000
+
+             ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -------------
+    Mean dimension             1.866206
+    Effective (superposition)  3.000000         0.968416
+    Effective (successive)     5.000000         0.979452
+    Effective (truncation)     5.000000         0.997763  M, D, L, s, t
+
     """
 
     def function(Xs):
@@ -660,6 +991,32 @@ def get_simple_beam_deflection():
 
     Reference:
         - K. Konakli, B. Sudret. "Low-Rank Tensor Approximations for Reliability Analysis" (2011), https://hal.archives-ouvertes.fr/hal-01169564/document
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    b           0.027403  0.029824   0.028602           0.028597
+    h           0.249043  0.265700   0.257325           0.257302
+    L           0.009869  0.010758   0.010310           0.010307
+    E           0.246565  0.263114   0.254794           0.254770
+    p           0.438237  0.459799   0.448969           0.448945
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.971117           0.971117
+          2         0.028571           0.999688
+          3         0.000311           0.999999
+          4         0.000001           1.000000
+
+            ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -----------
+    Mean dimension             1.029196
+    Effective (superposition)  1.000000         0.971117
+    Effective (successive)     1.000000         0.971117
+    Effective (truncation)     3.000000         0.959444  h, E, p
+
     """
 
     def function(Xs):
@@ -683,6 +1040,36 @@ def get_damped_oscillator(p=3):
 
     - "Metamodel-based importance sampling for structural reliability analysis", by Dubourg et al. (2013)
     - "Uncertainty Propagation of P-Boxes Using Sparse Polynomial Chaos Expansions", by Schoebi and Sudret (2016)
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    m_p         0.041272  0.090945   0.058892           0.055303
+    m_s         0.106763  0.162462   0.127068           0.123314
+    k_p         0.215040  0.334491   0.263963           0.258581
+    k_s         0.146806  0.261877   0.193555           0.188181
+    z_p         0.056309  0.083121   0.067595           0.066553
+    z_s         0.047952  0.064552   0.055676           0.055392
+    S_0         0.006767  0.008665   0.007640           0.007603
+    F_s         0.225617  0.225590   0.225611           0.225614
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.846526           0.846526
+          2         0.091934           0.938460
+          3         0.046414           0.984874
+          4         0.013584           0.998458
+          5         0.001521           0.999979
+          6         0.000021           1.000000
+
+            ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  ---------------------------------
+    Mean dimension             1.231703
+    Effective (superposition)  3.000000         0.984874
+    Effective (successive)     4.000000         0.988875
+    Effective (truncation)     7.000000         0.991335  m_p, m_s, k_p, k_s, z_p, z_s, F_s
 
     """
 
@@ -717,5 +1104,69 @@ def get_damped_oscillator(p=3):
             dict(name='z_s', dist=lognormal_with_given_moments(0.02, 0.01**2)),
             dict(name='S_0', dist=lognormal_with_given_moments(100, 10**2)),
             dict(name='F_s', dist=lognormal_with_given_moments(15, 1.5**2))]
+
+    return function, axes
+
+
+def get_cantilever_beam(output='displacement'):
+    """
+    A beam receives both a vertical and horizontal load on its extreme. We measure its mass/stress/displacement
+    Reference: Dakota Sensitivity Analysis and Uncertainty Quantification, with Examples (Sandia National Labs, https://dakota.sandia.gov/sites/default/files/docs/training/201508/DakotaTraining_SensitivityAnalysis.pdf)
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol      Total    Shapley    Banzhaf-Coleman
+    ----------  --------  ---------  ---------  -----------------
+    L           0.407853   0.468404   0.437815           0.437658
+    w           0.099618   0.117881   0.108608           0.108537
+    t           0.330980   0.383948   0.357171           0.357024
+    rho         0.000000   0.000000   0.000000           0.000000
+    E           0.052904   0.066693   0.059642           0.059563
+    X           0.002111   0.003077   0.002579           0.002572
+    Y           0.029570   0.039058   0.034185           0.034121
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.923036           0.923036
+          2         0.074892           0.997928
+          3         0.002048           0.999976
+          4         0.000024           1.000000
+
+            ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -----------
+    Mean dimension             1.079060
+    Effective (superposition)  2.000000         0.997928
+    Effective (successive)     3.000000         0.981763
+    Effective (truncation)     4.000000         0.957885  L, w, t, E
+
+    """
+
+    assert output in ('mass', 'stress', 'displacement')
+
+    def function(Xs):
+
+        L = Xs[:, 0]  # Beam length
+        w = Xs[:, 1]  # Width
+        t = Xs[:, 2]  # Thickness
+        rho = Xs[:, 3]  # Density
+        E = Xs[:, 4]  # Young's modulus
+        X = Xs[:, 5]  # Horizontal load
+        Y = Xs[:, 6]  # Vertical load
+
+        if output == 'mass':
+            return rho*w*t*L / (12**3)
+        elif output == 'stress':
+            return 600/(w*t**2)*Y + 600/(w**2*t)*X
+        else:
+            return 4*L**3/(E*w*t) * np.sqrt((Y / t**2)**2 + (X / w**2)**2)
+
+    axes = [dict(name='L', domain=(4, 6)),
+            dict(name='w', domain=(0.8, 1.2)),
+            dict(name='t', domain=(0.8, 1.2)),
+            dict(name='rho', domain=(400, 600)),
+            dict(name='E', domain=(23e6, 35e6)),
+            dict(name='X', domain=(40, 60)),
+            dict(name='Y', domain=(80, 120))]
 
     return function, axes
