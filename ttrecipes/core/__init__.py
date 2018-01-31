@@ -6,7 +6,7 @@ from .compression import *
 from .cross import *
 from .masks import *
 from .stats import *
-from .sensitivity import *
+from .sensitivity_indices import *
 from .sampling import *
 from .sets import *
 from .sparse import *

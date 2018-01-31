@@ -123,6 +123,24 @@ def tt_svd(X, eps, rmax=np.iinfo(np.int32).max, verbose=False):
     return tt.vector.from_list(cores)
 
 
+def full(t, keep_end_ranks=False):
+    """
+    NumPy's einsum() does quite a good job at TT reconstruction, especially for bigger tensors
+    """
+
+    if t.d > 26:
+        return t.full()
+    str = ','.join([chr(ord('a') + n) + chr(ord('A') + n) + chr(ord('a') + n + 1) for n in range(t.d)])
+    str += '->' + 'a' + ''.join([chr(ord('A') + n) for n in range(t.d)]) + chr(ord('a') + t.d)
+    result = np.einsum(str, *tt.vector.to_list(t), optimize=True)
+    if not keep_end_ranks:
+        if t.r[0] == 1:
+            result = result[0, ...]
+        if t.r[-1] == 1:
+            result = result[..., 0]
+    return result
+
+
 def round(t, eps, rmax=np.iinfo(np.int32).max, verbose=False):
     N = t.d
     shape = t.n
