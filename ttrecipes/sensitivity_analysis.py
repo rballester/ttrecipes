@@ -14,7 +14,7 @@ Todo:
 # Authors:      Rafael Ballester-Ripoll <rballester@ifi.uzh.ch>
 #               Enrique G. Paredes <egparedes@ifi.uzh.ch>
 #
-# Copyright:    TT Recipes project (c) 2016-2017
+# Copyright:    TT Recipes project (c) 2017-2018
 #               VMMLab - University of Zurich
 # -----------------------------------------------------------------------------
 
@@ -193,7 +193,7 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
 
     metrics = dict()
     metrics['variables'] = names
-    metrics['dimension_distribution'] = tr.core.sensitivity.dimension_distribution(st)
+    metrics['dimension_distribution'] = tr.core.dimension_distribution(st)
     metrics['mean_dimension'] = metrics['dimension_distribution'].dot(np.arange(1, N + 1))
     metrics['effective_superposition'] = tr.core.effective_dimension(
         st, effective_threshold, 'superposition')
