@@ -1,21 +1,30 @@
 # -*- coding: utf-8 -*-
-"""Sensitivity analysis functions.
-
-This module contains user-friendly functions computing different sensitivity
-analysis metrics on N-dimensional black-box functions approximated with
-Tensor Trains.
-
+"""
+Higher-level functions to gather many sensitivity analysis metrics
+from N-dimensional black-box functions approximated as TT tensors.
 Todo:
     * Add derivative-based and histogram-based metrics
-
 """
 
 # -----------------------------------------------------------------------------
 # Authors:      Rafael Ballester-Ripoll <rballester@ifi.uzh.ch>
 #               Enrique G. Paredes <egparedes@ifi.uzh.ch>
 #
-# Copyright:    TT Recipes project (c) 2017-2018
+# Copyright:    ttrecipes project (c) 2017-2018
 #               VMMLab - University of Zurich
+#
+# ttrecipes is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ttrecipes is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with ttrecipes.  If not, see <http://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 
 from __future__ import (absolute_import, division, print_function,

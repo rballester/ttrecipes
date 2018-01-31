@@ -1,24 +1,36 @@
+"""
+Example interpolation in the TT format for a tensor with continuous variables
+This method is equivalent to polynomial chaos expansions (PCE) with 3 differences:
+- We discretize the polynomial bases along each axis. This is optional, e.g. the spectral
+tensor train decomposition (Bigoni et al., 2014) keeps the continuous factors. Our way introduces
+numerical error (usually negligible), but on the other hand, makes things simpler: the
+surrogate is a standard TT, and also no special treatment has to be given to categorical variables.
+- We consider the full space of polynomials (up to a bounded degree). In classical PCE this
+would be a problem due to the curse of dimensionality. So in practice PCE users bound the total
+degree sum*, use the hyperbolic constrain by Blatman and Sudret (2010), or add a regularization
+term to encourage sparsity.
+- The space of polynomial coefficients is expressed as a low-rank TT format. This adds extra
+regularization, and also a hyperparameter: which TT rank (or ranks) to take.
+"""
+
 # -----------------------------------------------------------------------------
-# Example interpolation in the TT format for a tensor with continuous variables
-# This method is equivalent to polynomial chaos expansions (PCE) with 3 differences:
-#
-# - We discretize the polynomial bases along each axis. This is optional, e.g. the spectral
-# tensor train decomposition (Bigoni et al., 2014) keeps the continuous factors. Our way introduces
-# numerical error (usually negligible), but on the other hand, makes things simpler: the
-# surrogate is a standard TT, and also no special treatment has to be given to categorical variables.
-#
-# - We consider the full space of polynomials (up to a bounded degree). In classical PCE this
-# would be a problem due to the curse of dimensionality. So in practice PCE users bound the total
-# degree sum*, use the hyperbolic constrain by Blatman and Sudret (2010), or add a regularization
-# term to encourage sparsity.
-#
-# - The space of polynomial coefficients is expressed as a low-rank TT format. This adds extra
-# regularization, and also a hyperparameter: which TT rank (or ranks) to take.
-#
 # Authors:      Rafael Ballester-Ripoll <rballester@ifi.uzh.ch>
 #
-# Copyright:    ttrecipes project (c) 2017
+# Copyright:    ttrecipes project (c) 2017-2018
 #               VMMLab - University of Zurich
+#
+# ttrecipes is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ttrecipes is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with ttrecipes.  If not, see <http://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 
 import numpy as np
