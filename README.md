@@ -2,19 +2,20 @@
 
 *TT recipes* are routines for [tensor train](http://epubs.siam.org/doi/abs/10.1137/090752286) analysis, optimization and visualization via careful manipulation of the TT cores. We make heavy use of many key possibilities offered by the TT model (many are provided by the great [ttpy toolbox](https://github.com/oseledets/ttpy)):
 
-- Compressing/decompressing full and sparse tensors
-- Elementary operations for tensors: stacking, transposing, etc.
-- Recompressing existing tensors (TT-round algorithm)
-- [Cross-approximation](http://www.mat.uniroma2.it/~tvmsscho/papers/Tyrtyshnikov5.pdf) wrapper for surrogate modeling
-- Completion and regression (alternating least squares)
-- Sampling schemes for parameter spaces
-- Variance-based sensitivity analysis: Sobol indices, Shapley values, effective dimensions, etc.
-- Mask tensors and TTs that generalize deterministic finite automata
-- Visualization of TT tensors (also interactive)
+- Compressing/decompressing full and sparse tensors ([```compression.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/compression.py), [```sparse.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sparse.py))
+- Operations on tensors: stacking, transposing, computing moments, etc. ([```util.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/util.py), [```analysis.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/analysis.py))
+- Recompressing existing tensors (TT-round algorithm) ([```compression.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/compression.py))
+- [Cross-approximation](http://www.mat.uniroma2.it/~tvmsscho/papers/Tyrtyshnikov5.pdf) wrapper for building tensors and surrogate modeling ([```cross.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/cross.py))
+- Completion and regression ([```completion.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/completion.py))
+- Sampling schemes for parameter spaces ([```sampling.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sampling.py))
+- Variance-based sensitivity analysis: Sobol indices, Shapley values, effective dimensions, etc. ([```sensitivity_indices.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sensitivity_indices.py), [```sensitivity_analysis.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/sensitivity_analysis.py))
+- Mask tensors and TTs that generalize deterministic finite automata ([```masks.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/masks.py), [```sets.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sets.py))
+- Visualization of TT tensors ([```mpl.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/mpl.py), [```tikz.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/tikz.py))
+- A library of analytical models from physics, engineering, and computational science ([```models.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/models.py))
 
 ## Installation
 
-The current version of the _ttpy_ toolbox in PyPI has some incompatibilities with _TT recipes_. The provided _requirements.txt_ and _environment.yml_ files install a compatible version from the _ttpy_ [repository](https://github.com/oseledets/ttpy). The recommended way to install _TT recipes_ and its dependencies is:
+The current version of _ttpy_ in PyPI has some incompatibilities with _TT recipes_. The provided _requirements.txt_ and _environment.yml_ files install a compatible version from the _ttpy_ [repository](https://github.com/oseledets/ttpy). The recommended way to install _TT recipes_ and its dependencies is:
 
     git clone https://github.com/rballester/ttrecipes.git
     cd ttrecipes
@@ -34,7 +35,7 @@ In both cases, run this last command to install __ttrecipes__ in editable mode:
 
 ## Examples
 
-See the ```examples/``` folder for some sample scripts. Check out [this Jupyter Notebook](https://github.com/rballester/ttrecipes/blob/master/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb) for the examples used in our paper *Tensor Approximation of Advanced Metrics for Sensitivity Analysis*.
+See the [```examples/```](https://github.com/rballester/ttrecipes/tree/master/examples) folder for some sample scripts. Check out [this Jupyter Notebook](https://github.com/rballester/ttrecipes/blob/master/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb) for the examples used in our paper [Tensor Approximation of Advanced Metrics for Sensitivity Analysis](https://arxiv.org/abs/1712.01633).
 
 You can also run and interact with the notebook online using Binder or Microsoft Azure Notebooks (a free Azure account is needed).
 
@@ -53,7 +54,7 @@ tr.core.anyfunction()
 - Higher-level functions are grouped as modules that have to be imported explicitly. Currently, there are:
     - ```mpl.py```: TT visualization using *matplotlib*
     - ```tikz.py```: TT visualization using *TikZ*
-    - ```models.py```: a library of analytical functions for surrogate modeling, sensitivity analysis, etc.
+    - ```models.py```: analytical functions for surrogate modeling, sensitivity analysis, etc.
     - ```sensitivity_analysis.py```: high-level querying of Sobol indices, displaying and tabulating Sobol and other sensitivity metrics, etc.
 
 ## References
