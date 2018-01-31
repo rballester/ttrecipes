@@ -131,7 +131,6 @@ def ticks_list(Xs, shape=64):
     return [np.linspace(left, right, I) for left, right, I in zip(np.amin(Xs, axis=0), np.amax(Xs, axis=0), shape)]
 
 
-
 def indices_to_coordinates(Xs, ticks_list):
     """
     Map integer indices (tensor entries) to space coordinates
@@ -470,7 +469,7 @@ def random_tt(shape, ranks=1):
 
     cores = []
     for i in range(len(shape)):
-        cores.append(np.random.rand(ranks[i], shape[i], ranks[i + 1]))
+        cores.append(np.random.randn(ranks[i], shape[i], ranks[i + 1]))
     return tt.vector.from_list(cores)
 
 
@@ -697,20 +696,21 @@ def derive(t, modes=None, order=1):
 def shift_mode(t, n, shift, eps='same'):
     """
     Shift a mode back or forth within a TT
+
     :param t:
     :param n: which mode to move
     :param shift: how many positions to move. If positive move right, if negative move left
     :param eps: prescribed relative error tolerance. If 'same' (default), ranks will be kept no larger than the original
     :return: the transposed tensor
+
     """
 
     N = t.d
-    assert n - shift >= 0
-    assert n + shift < N
+    assert 0 <= n + shift < N
 
     if shift == 0:
         return copy.deepcopy(t)
-    cores = tt.vector.to_list(t)
+    cores = copy.deepcopy(tt.vector.to_list(t))
     tr.core.orthogonalize(cores, n)
     sign = np.sign(shift)
     for i in range(n, n + shift, sign):
@@ -740,36 +740,69 @@ def shift_mode(t, n, shift, eps='same'):
     return tt.vector.from_list(cores)
 
 
-def concatenate(t1, t2, n):
+def concatenate(ts, axis, eps=0, rmax=np.iinfo(np.int32).max, verbose=False):
     """
-    Given two TT tensors, stack them along a specified dimension n
+    Given a list of TT tensors, stack them along a specified dimension axis
+
+    :param ts: a list of TTs of the same dimension N
+    :param axis: an integer. All TTs must have the same shape, except along this axis
+    :param eps: default is 0
+    :param rmax: default is infinite
+    :param verbose:
+    :return: a TT, the concatenation
+
     """
 
-    N = t1.d
-    if t2.d != N:
-        raise ValueError('For concatenation, both tensors must have the same dimensionality')
-    check = list(range(N))
-    del check[n]
-    if not all(t1.n[check] == t2.n[check]):
-        raise ValueError('For concatenation, both tensors must have equal sizes along all (but one) modes')
+    def concatenate_pair(t1, t2, axis):
 
-    cores1 = tt.vector.to_list(t1)
-    cores2 = tt.vector.to_list(t2)
-    cores = []
-    for mu in range(N):
-        if mu != n:
-            core = np.zeros([cores1[mu].shape[0] + cores2[mu].shape[0], cores1[mu].shape[1], cores1[mu].shape[2] +
-                             cores2[mu].shape[2]])
-            core[:cores1[mu].shape[0], :, :cores1[mu].shape[2]] = cores1[mu]
-            core[cores1[mu].shape[0]:, :, cores1[mu].shape[2]:] = cores2[mu]
-        else:
-            core = np.zeros([cores1[mu].shape[0] + cores2[mu].shape[0], cores1[mu].shape[1] + cores2[mu].shape[1],
-                             cores1[mu].shape[2] + cores2[mu].shape[2]])
-            core[:cores1[mu].shape[0], :cores1[mu].shape[1], :cores1[mu].shape[2]] = cores1[mu]
-            core[cores1[mu].shape[0]:, cores1[mu].shape[1]:, cores1[mu].shape[2]:] = cores2[mu]
-        if mu == 0:
-            core = np.sum(core, axis=0, keepdims=True)
-        elif mu == N-1:
-            core = np.sum(core, axis=2, keepdims=True)
-        cores.append(core)
-    return tt.vector.from_list(cores)
+        if t1 is None:
+            return copy.deepcopy(t2)
+        N = t1.d
+        if t2.d != N:
+            raise ValueError('For concatenation, both tensors must have the same dimensionality')
+        check = list(range(N))
+        del check[axis]
+        if not all(t1.n[check] == t2.n[check]):
+            raise ValueError('For concatenation, both tensors must have equal sizes along all (but one) modes')
+
+        cores1 = tt.vector.to_list(t1)
+        cores2 = tt.vector.to_list(t2)
+        cores = []
+        for n in range(N):
+            if n != axis:
+                core = np.zeros([cores1[n].shape[0] + cores2[n].shape[0], cores1[n].shape[1], cores1[n].shape[2] +
+                                 cores2[n].shape[2]])
+                core[:cores1[n].shape[0], :, :cores1[n].shape[2]] = cores1[n]
+                core[cores1[n].shape[0]:, :, cores1[n].shape[2]:] = cores2[n]
+            else:
+                core = np.zeros([cores1[n].shape[0] + cores2[n].shape[0], cores1[n].shape[1] + cores2[n].shape[1],
+                                 cores1[n].shape[2] + cores2[n].shape[2]])
+                core[:cores1[n].shape[0], :cores1[n].shape[1], :cores1[n].shape[2]] = cores1[n]
+                core[cores1[n].shape[0]:, cores1[n].shape[1]:, cores1[n].shape[2]:] = cores2[n]
+            if n == 0:
+                core = np.sum(core, axis=0, keepdims=True)
+            elif n == N-1:
+                core = np.sum(core, axis=2, keepdims=True)
+            cores.append(core)
+        return tt.vector.from_list(cores)
+
+    # Tree-like procedure, as in sum_and_compress
+    d = dict()
+    result = ts[0]
+    for i in range(1, len(ts)):
+        if verbose and i % 100 == 0:
+            print("concatenate: {}-th element".format(i))
+        climb = 0  # For going up the tree
+        new = ts[i]
+        while climb in d:
+            if verbose:
+                print("Hierarchy level:", climb, "- We concatenate", new.n, "and", d[climb].n)
+            new = concatenate_pair(d[climb], new, axis=axis)
+            if eps > 0 or rmax is not None:
+                new = tt.vector.round(new, eps, rmax=rmax)
+            d.pop(climb)
+            climb += 1
+        d[climb] = new
+    for key in sorted(d.keys())[::-1]:
+        result = concatenate_pair(result, d[key], axis=axis)
+    return result

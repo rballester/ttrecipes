@@ -48,6 +48,17 @@ class TestUtil(TestCase):
                 reco = reco[idx1 + idx2_copy]
                 self.assertAlmostEqual(np.linalg.norm(reco - gt) / np.linalg.norm(gt), 0)
 
+    def test_shift_mode(self):
+        N = 6
+        Is = np.random.randint(2, 10, N)
+        Rs = [1] + [3]*(N-1) + [1]
+        t = tr.core.random_tt(shape=Is, ranks=Rs)
+        eps = 1e-3
+        for dim in range(N):
+            tshift = tr.core.shift_mode(t, dim, -dim, eps=eps)  # Put dim at the beginning
+            tshift2 = tr.core.shift_mode(tshift, 0, dim, eps=eps)  # Swap back dim where it was
+            self.assertLessEqual(tt.vector.norm(tshift2 - t) / tt.vector.norm(t), 2*eps)
+
     def test_concatenate(self):
         N = np.random.randint(4, 10)
         n = np.random.randint(N)
@@ -57,6 +68,6 @@ class TestUtil(TestCase):
         Rs = [1] + [3]*(N-1) + [1]
         t1 = tr.core.random_tt(shape=Is1, ranks=Rs)
         t2 = tr.core.random_tt(shape=Is2, ranks=Rs)
-        t = tr.core.concatenate(t1, t2, n=n)
+        t = tr.core.concatenate([t1, t2], axis=n)
         self.assertAlmostEqual(tt.vector.norm(t1 - t[[slice(None)]*n + [slice(Is1[n])] + [slice(None)]*(N-n-1)]), 0)
         self.assertAlmostEqual(tt.vector.norm(t2 - t[[slice(None)]*n + [slice(Is1[n], None)] + [slice(None)]*(N-n-1)]), 0)
