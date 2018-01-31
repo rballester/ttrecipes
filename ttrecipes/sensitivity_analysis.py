@@ -44,7 +44,7 @@ import ttrecipes as tr
 def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
                 dist_fraction=0.00005, fun_mode="array",
                 eps=1e-5, verbose=False, cross_kwargs=None, random_seed=None,
-                max_order=2, show=False):
+                max_order=2, show=True):
     """Variance-based sensitivity analysis.
 
     User-friendly wrapper that conducts a general variance-based sensitivity
@@ -95,7 +95,7 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
             Defaults to None.
         max_order (int, optional): Maximum order of the collected Sobol indices.
             Defaults to 2.
-        show (bool, optional): Print results. Defaults to False.
+        show (bool, optional): Print results. Defaults to True.
 
     Returns:
         tuple(dict, dict): A 'metrics' dictionary containing a structured and

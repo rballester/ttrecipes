@@ -114,6 +114,7 @@ def categorical_ALS(Xs, ys, ws=None, shape=None, x0=None, ranks=1, nswp=10, verb
 
     normys = np.linalg.norm(ys)
     cores = tt.vector.to_list(x0)
+    tr.core.orthogonalize(cores, 0)
 
     # Memoized product chains for all groundtruth points
     # lefts will be initialized on the go
@@ -141,8 +142,10 @@ def categorical_ALS(Xs, ys, ws=None, shape=None, x0=None, ranks=1, nswp=10, verb
             sse += residuals
         # Update product chains for next core
         if direction == 'right':
+            tr.core.left_orthogonalize(cores, mu)
             lefts[mu+1] = np.einsum('ijk,kjl->ijl', lefts[mu], cores[mu][:, Xs[:, mu], :])
         else:
+            tr.core.right_orthogonalize(cores, mu)
             rights[mu-1] = np.einsum('ijk,kjl->ijl', cores[mu][:, Xs[:, mu], :], rights[mu])
         return sse
 
@@ -314,3 +317,22 @@ def pce_interpolation(Xs, ys, ws=None, shape=None, x0=None, ranks=None, ranks2=N
         lasteps = eps
 
     return tt.vector.from_list(cores)
+
+
+def inverse_distance_weighting(Xs, ys, shape, p=2, **kwargs):
+    """
+    Shepard's method with a simple kernel. Should not be used with noisy data
+    """
+
+    Xs = Xs.astype(int)
+    if shape is None:
+        shape = np.amax(Xs, axis=0)+1
+
+    def interpolate(xs):
+        invdists = xs[:, :, np.newaxis] - Xs.T[np.newaxis, :, :]
+        invdists = 1 / (np.sqrt(np.sum(invdists**2, axis=1)))**p
+        denominator = np.sum(invdists, axis=1)
+        nominator = np.sum(invdists * ys[np.newaxis, :], axis=1)
+        return nominator / denominator
+
+    return tr.core.cross(ticks_list=[np.arange(sh) for sh in shape], fun=interpolate, **kwargs)

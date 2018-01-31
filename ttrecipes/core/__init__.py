@@ -7,6 +7,7 @@ from .cross import *
 from .masks import *
 from .stats import *
 from .sensitivity import *
+from .sampling import *
 from .sets import *
 from .sparse import *
 from .util import *
