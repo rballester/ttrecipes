@@ -1170,3 +1170,88 @@ def get_cantilever_beam(output='displacement'):
             dict(name='Y', domain=(80, 120))]
 
     return function, axes
+
+
+def get_ebola_spread(country='Liberia'):
+    """
+    8-dimensional model that predicts the Ebola virus reproduction number, i.e. the average number of secondary
+    infections that are expected in an outbreak of the disease. The inputs' ranges depend on the country (Liberia or
+    Sierra Leone).
+
+    References:
+
+    - P. Diaz, P. Constantine, K. Kalmbach, E. Jones, and S. Pankavich: "A Modified SEIR Model for the Spread of Ebola in Western Africa and Metrics for Resource Allocation" (2016)
+    - P.G. Constantine, E. Dow, and Q. Wang: "Active subspaces in theory and practice: applications to kriging
+    surfaces" (2014)
+
+            ** SENSITIVITY INDICES **
+    Variable       Sobol     Total    Shapley    Banzhaf-Coleman
+    ----------  --------  --------  ---------  -----------------
+    beta_1      0.185387  0.229694   0.207100           0.206880
+    beta_2      0.006249  0.008929   0.007544           0.007522
+    beta_3      0.252781  0.279617   0.266080           0.266021
+    rho_1       0.003039  0.004596   0.003785           0.003768
+    gamma_1     0.164199  0.188713   0.176349           0.176296
+    gamma_1     0.164199  0.188713   0.176349           0.176296
+    omega       0.002118  0.003261   0.002663           0.002650
+    phi         0.232172  0.311165   0.271076           0.270779
+
+            ** DIMENSION DISTRIBUTION **
+      Order    Rel. Variance    Cumul. Variance
+    -------  ---------------  -----------------
+          1         0.892648           0.892648
+          2         0.103536           0.996184
+          3         0.003793           0.999977
+          4         0.000023           1.000000
+
+            ** DIMENSION METRICS **
+    Dimension Metric              Value    Rel. Variance  Variables
+    -------------------------  --------  ---------------  -------------------------------------
+    Mean dimension             1.111192
+    Effective (superposition)  2.000000         0.996184
+    Effective (successive)     5.000000         0.952108
+    Effective (truncation)     5.000000         0.984219  beta_1, beta_3, gamma_1, gamma_1, phi
+
+    """
+
+    assert country in ('Liberia', 'Sierra Leone')
+
+    def function(Xs):
+
+        # Parameter interpretation: https://arxiv.org/pdf/1603.04955.pdf, table 1
+
+        beta_1 = Xs[:, 0]
+        beta_2 = Xs[:, 1]
+        beta_3 = Xs[:, 2]
+        rho_1 = Xs[:, 3]
+        gamma_1 = Xs[:, 4]
+        gamma_2 = Xs[:, 5]
+        omega = Xs[:, 6]
+        phi = Xs[:, 7]
+
+        R_0 = (beta_1 + (beta_2 * rho_1 * gamma_1)/omega + beta_3/gamma_2*phi) / (gamma_1 + phi)  # Reproduction number
+
+        return R_0
+
+    # Axes: from https://arxiv.org/pdf/1603.04955.pdf, table 7
+
+    if country == 'Liberia':
+        axes = [dict(name='beta_1', domain=(0.1, 0.4)),
+                dict(name='beta_2', domain=(0.1, 0.4)),
+                dict(name='beta_3', domain=(0.05, 0.2)),
+                dict(name='rho_1', domain=(0.41, 1)),
+                dict(name='gamma_1', domain=(0.0276, 0.1702)),
+                dict(name='gamma_1', domain=(0.081, 0.21)),
+                dict(name='omega', domain=(0.25, 0.5)),
+                dict(name='phi', domain=(0.0833, 0.7))]
+    else:
+        axes = [dict(name='beta_1', domain=(0.1, 0.4)),
+                dict(name='beta_2', domain=(0.1, 0.4)),
+                dict(name='beta_3', domain=(0.05, 0.2)),
+                dict(name='rho_1', domain=(0.41, 1)),
+                dict(name='gamma_1', domain=(0.0275, 0.1569)),
+                dict(name='gamma_1', domain=(0.1236, 0.384)),
+                dict(name='omega', domain=(0.25, 0.5)),
+                dict(name='phi', domain=(0.0833, 0.7))]
+
+    return function, axes
