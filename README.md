@@ -13,6 +13,10 @@
 - Visualization of TT tensors ([```mpl.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/mpl.py), [```tikz.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/tikz.py))
 - A library of analytical models from physics, engineering, and computational science ([```models.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/models.py))
 
+Example of surrogate modeling interactive navigation (a [gradient boosting regressor](http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.GradientBoostingRegressor.html) trained on the [*UCI Airfoil Self-Noise Data Set*](https://archive.ics.uci.edu/ml/datasets/airfoil+self-noise), converted to the TT format):
+
+[<img src="https://github.com/rballester/ttrecipes/blob/master/images/airfoil_self_noise.png" width="768" title="Airfoil self-noise">](https://github.com/rballester/ttrecipes/raw/master/images/airfoil_self_noise.png)
+
 ## Installation
 
 The current version of _ttpy_ in PyPI has some incompatibilities with _TT recipes_. The provided _requirements.txt_ and _environment.yml_ files install a compatible version from the _ttpy_ [repository](https://github.com/oseledets/ttpy). The recommended way to install _TT recipes_ and its dependencies is:
