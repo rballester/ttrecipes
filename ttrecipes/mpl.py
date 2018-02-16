@@ -42,6 +42,11 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
     Create an interactive chart to navigate a TT surrogate model. The chart contains different approximated subspaces
     that pass through a focus (the "focus focus"). The user can click and drag on the plots to vary this focus
 
+    Other features:
+    - Buttons to bring you to the surrogate's maximum, minimum, random point, or closest groundtruth point (if given)
+    - Double click on a plot to find the associated subspace with maximal (left button) resp. minimal (right button)
+    variance
+
     :param t: an N-dimensional TT
     :param names: N strings with the variable names. If None (default), generic names will be given
     :param ticks_list: N vectors containing the ticks for each axis. If None (default), [0, ..., In-1] will be used
@@ -141,9 +146,9 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
 
     def update(event, labelsize=labelsize):
         if event is not None:
-            if event.inaxes is None:  # If the user has clicked outside of the plots
+            if event.inaxes is None:  # The user clicked outside any axis
                 return
-            if event.inaxes == axmax:
+            if event.inaxes == axmax:  # The user clicked a button axis
                 for n in range(N):
                     focus[n] = estimated_maximum_point[n]
             elif event.inaxes == axmin:
@@ -156,11 +161,20 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
                 closest = Xs[np.argmin(np.sum((Xs - focus[np.newaxis, :])**2, axis=1)), :]
                 for n in range(N):
                     focus[n] = closest[n]
-            else:
+            else:  # The user clicked a plot axis
                 # Find which subplot was clicked
                 clicked_axis = np.where(np.asarray(ax) == event.inaxes)[0][0]
+                if event.dblclick:  # A double click brings us to the subspace with maximal variance
+                    tmoments = tr.core.moments(t, modes=dims[clicked_axis], order=2, centered=True, normalized=False,
+                                       keepdims=True, eps=1e-2, rmax=5, verbose=False)
+                    if event.button == 1:  # Left double click: find maximum
+                        val, point = tr.core.maximize(tmoments, rmax=5)
+                    elif event.button == 3:  # Left double click: find minimum
+                        val, point = tr.core.minimize(tmoments, rmax=5)
+                    for n in range(N):
+                        focus[n] = point[n]
                 # Closest axis sample to the clicked focus
-                if diagrams[clicked_axis] == "plot":
+                elif diagrams[clicked_axis] == "plot":
                     new_x = (np.abs(ticks_list[dims[clicked_axis][
                              0]] - event.xdata)).argmin()
                     focus[dims[clicked_axis][0]] = new_x
@@ -169,8 +183,6 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
                              0]] - event.xdata)).argmin()
                     new_y = (np.abs(ticks_list[dims[clicked_axis][
                              1]] - event.ydata)).argmin()
-                    focus[dims[clicked_axis][0]] = new_x
-                    focus[dims[clicked_axis][1]] = new_y
                     focus[dims[clicked_axis][0]] = new_x
                     focus[dims[clicked_axis][1]] = new_y
                 elif diagrams[clicked_axis] == "surface":
@@ -228,7 +240,6 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
                     a = estimated_minimum
                     b = estimated_maximum
                     ax[i].set_ylim([(a + b) / 2 - (b - a) / 2 * 1.1, (a + b) / 2 + (b - a) / 2 * 1.1])
-                    print(a, b, [(a + b) / 2 - (b - a) / 2 * 1.1, (a + b) / 2 + (b - a) / 2 * 1.1])
                     # Vertical lines marking the focus
                     vlines[i] = ax[i].axvline(x=ticks_list[index[0]][
                                               focus[index[0]]], ymin=0, ymax=1, linewidth=5, color='red', alpha=0.5)
@@ -250,8 +261,6 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
                     rgba_colors = np.repeat(np.array([[0, 0, 0.6, 0]]), len(plot_x), axis=0)
                     dist_score = np.exp(-np.square(dists[dists <= gt_range]) / (
                         2 * np.square(gt_range / 6) + np.finfo(np.float32).eps))
-                    # print(dist_score.min(), dist_score.max())
-                    # assert 0
                     rgba_colors[:, 3] = dist_score
                     gt_markers[i] = ax[i].scatter(
                         plot_x, plot_y, s=50*dist_score, c=rgba_colors, linewidths=0)
@@ -425,3 +434,74 @@ def navigation(t, names=None, ticks_list=None, output_name='y', coords=None, ys=
     brand.on_clicked(lambda event: update(None))
     # plt.subplots_adjust(top=0.9)
     plt.show()
+
+
+def set_chord_diagram(st, names=None, color='darkblue', n_verts=32, threshold=0.0005, normalization=True, title=None, savefig=False):
+    """
+    Draw a chord diagram where:
+        - Node area is proportional to 1st-order interactions;
+        - Edge width is proportional to 2nd-order interactions;
+
+    :param st: a 2^N tensor
+    :param names: list of variable names
+
+    """
+
+    plt.style.use('seaborn')
+
+    N = st.d
+    if names is None:
+        names = ['x_{}'.format(n) for n in range(N)]
+
+    data = np.empty([N, N])
+    for i in range(N):
+        for j in range(N):
+            data[i, j] = tr.core.set_choose(st, modes=[i, j])
+
+    if normalization is True:
+        normalization = data.max()
+    coords = np.asarray([[np.cos(float(i)/N*2*np.pi), np.sin(float(i)/N*2*np.pi)] for i in range(N)])
+    coords_rot = np.asarray([[np.cos(float(i+0.2)/N*2*np.pi)-0.05, np.sin(float(i+0.2)/N*2*np.pi)] for i in range(N)]) # For text
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    plt.axis('off')
+    # cm = plt.get_cmap(colormap)
+
+    def cubic_bezier(P, n_verts=n_verts):
+        """
+        Creates a cubic Bezier curve in 2D between P[0] and P[3], with control points P[1] and P[2]
+
+        :param P: a 2D array of size 4 x 2
+        :param n_verts: how many points to generate
+        :returns: a 2D array of size n_verts x 2
+
+        """
+
+        ts = np.linspace(0, 1, n_verts)[:, np.newaxis]
+        return (1 - ts)**3*P[0:1, :] + 3*(1-ts)**2*ts*P[1:2, :] + 3*(1-ts)*ts**2*P[2:3, :] + ts**3*P[3:4, :]
+
+    for data_i in range(N):
+        for data_j in range(data_i+1, N):
+            if np.abs(data[data_i, data_j] / normalization) >= threshold:
+                x1 = coords[data_i]
+                x2 = coords[data_j]
+                verts = cubic_bezier(np.array([x1, x1*3/4, x2*3/4, x2]))
+                for i in range(len(verts)-1):
+                    ax.plot(verts[i:i+2, 0], verts[i:i+2, 1], lw=20*data[data_i, data_j]/normalization, zorder=1,
+                            c=color, alpha=1)
+
+    ax.scatter(coords[:, 0], coords[:, 1],
+               20*matplotlib.rcParams['lines.markersize']*np.diag(data)/normalization, c=color, zorder=2)
+    for coord, name in zip(coords_rot, names):
+        txt = ax.text(coord[0], coord[1], name)
+
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)
+    ax.set_aspect('equal')
+    if title is not None:
+        plt.title(title)
+    if savefig:
+        plt.savefig(savefig)
+    else:
+        plt.show()
