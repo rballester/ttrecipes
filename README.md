@@ -65,6 +65,17 @@ tr.core.anyfunction()
     - [```models.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/models.py): analytical functions for surrogate modeling, sensitivity analysis, etc.
     - [```sensitivity_analysis.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/sensitivity_analysis.py): high-level querying of Sobol indices, displaying and tabulating Sobol and other sensitivity metrics, etc.
 
+For instance, use the following to visualize a TT tensor ([tt.vector object from ttpy](https://github.com/oseledets/ttpy/blob/develop/tt/core/vector.py)):
+
+```
+import ttrecipes.mpl
+tr.mpl.navigation(t)
+```
+
+## Acknowledgment
+
+This work was partially supported by the [UZH Forschungskredit "Candoc"](http://www.researchers.uzh.ch/en/funding/phd/fkcandoc.html), grant number FK-16-012.
+
 ## References
 
 - I. Oseledets. [*Tensor-train decomposition* (2011)](http://epubs.siam.org/doi/abs/10.1137/090752286)
