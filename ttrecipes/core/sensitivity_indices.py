@@ -74,7 +74,7 @@ def sobol_tt(t, pdf=None, premultiplied=False, eps=1e-6, verbose=False, **kwargs
     return (sobol - correction*sobol[[0, ]*N]).round(eps=0)
 
 
-def semivalues(game, ps, p=None, eps=1e-10):
+def semivalues(game, ps, p=None):
     """
     Compute all N semivalues for each of N players. Each semivalue 1, ..., N has cost O(N^3 R) + O(N^2 R^2),
     where R is the game's rank
@@ -116,7 +116,6 @@ def semivalues(game, ps, p=None, eps=1e-10):
     ws_cores = ws_cores[:-1]
     ws_cores = [np.concatenate([core, core[:, 0:1, :]], axis=1) for core in ws_cores]
     ws = tt.vector.from_list(ws_cores)
-    ws = tt.vector.round(ws, eps=eps)
 
     result = []
     for n in range(N):
