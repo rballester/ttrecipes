@@ -395,19 +395,72 @@ def orthogonalize(cores, mu):
     return R, L
 
 
-def squeeze(t):
+def insert_dummies(t, modes, shape=1):
+    """
+    Inserts dummy dimensions, i.e. modes along which the tensor does not change
+
+    :param t: input TT
+    :param modes: indices where the dummy dimensions should be after insertion
+    :param shape: new dimensions' sizes
+    :return: a longer TT
+
+    """
+
+    print(t)
+    N = t.d
+    if not hasattr(modes, '__len__'):
+        modes = [modes]
+    if not hasattr(shape, '__len__'):
+        shape = [shape]*len(modes)
+    M = N + len(modes)
+    assert len(modes) == len(shape)
+
+    cores = tt.vector.to_list(t)
+    newcores = [None]*M
+    for n, core in zip(np.delete(np.arange(M), modes), cores):
+        newcores[n] = core
+    lastrank = 1
+    counter = 0
+    for n, sh in zip(modes, shape):
+        lastrank = 1
+        if n > 0:
+            lastrank = newcores[n-1].shape[2]
+        newcores[n] = np.repeat(np.eye(lastrank)[:, np.newaxis, :], sh, axis=1)
+        counter += 1
+    if newcores[0].shape[0] > 1:
+        newcores[0] = newcores[0][0:1, ...]
+    if newcores[-1].shape[2] > 1:
+        newcores[-1] = newcores[-1][..., 0:1]
+        # if n == 0:
+        #     rleft = 1
+        # else:
+        #     rleft = newcores[n-1].shape[2]
+        # if n == M-1:
+        #     rright = 1
+        # else:
+        #     rright = newcores[n+1].shape[0]
+        # newcores[n] = np.ones([rleft, sh, rright])
+    return tt.vector.from_list(newcores)
+
+
+def squeeze(t, modes=None):
     """
     Removes singleton dimensions
 
     :param t: A TT tensor
+    :param modes: which modes to delete. By default, all that have size 1
     :return: Another TT tensor, without dummy (singleton) indices
     """
+
+    if modes is None:
+        modes = np.where(t.n == 1)[0]
+    assert np.all(t.n[modes] == 1)
 
     cores = tt.vector.to_list(t)
     newcores = []
     curcore = None
     for mu in range(len(cores)):
-        if cores[mu].shape[1] == 1:
+        if cores[mu].shape[1] == 1 and mu in modes:
             if curcore is None:
                 curcore = cores[mu]
             else:
@@ -464,7 +517,7 @@ def random_tt(shape, ranks=1):
 
     cores = []
     for i in range(len(shape)):
-        cores.append(np.random.randn(ranks[i], shape[i], ranks[i + 1]))
+        cores.append(np.random.rand(ranks[i], shape[i], ranks[i + 1]))
     return tt.vector.from_list(cores)
 
 
@@ -505,32 +558,58 @@ def gaussian_tt(shape, sigmas):
     return separable_tt(ticks_list)
 
 
-def meshgrid(shape):
+def meshgrid(xi):
     """
+    Similar to NumPy meshgrid
+
+    :param xi: list of N axes, each must be a vector (or an integer n, then np.arange(n) is used)
+
     :return: A list of N TT tensors, equivalent to NumPy's meshgrid() for the given shape
+
     """
 
     grids = []
-    for dim in range(len(shape)):
-        grid = [np.ones([1, sh, 1], dtype=np.int) for sh in shape]
-        grid[dim] = np.reshape(np.arange(shape[dim], dtype=np.int), [1, shape[dim], 1])
+    ticks_list = []
+    for ticks in xi:
+        if not hasattr(ticks, '__len__'):
+            ticks = np.arange(ticks, dtype=np.int)
+        ticks_list.append(ticks)
+    for dim in range(len(xi)):
+        grid = [np.ones([1, len(ticks), 1], dtype=np.int) for ticks in ticks_list]
+        grid[dim] = ticks_list[dim][np.newaxis, :, np.newaxis]
         grids.append(tt.vector.from_list(grid))
     return grids
 
 
-def sum(t):
+def sum(t, modes=None, keepdims=False):
     """
     Sum all elements of a TT
 
     :param t:
+    :param modes:
     :return: a scalar
 
     """
 
-    result = np.array([[1]])
-    for core in tt.vector.to_list(t):
-        result = result.dot(np.sum(core, axis=1))
-    return np.squeeze(result)
+    N = t.d
+    allsum = False
+    if modes is None:
+        allsum = True
+        modes = np.arange(N)
+    if not hasattr(modes, '__len__'):
+        modes = [modes]
+
+    cores = tt.vector.to_list(t)
+    for n in modes:
+        cores[n] = np.sum(cores[n], axis=1, keepdims=True)
+    t = tt.vector.from_list(cores)
+    if allsum:
+        return np.asscalar(t.full())
+    else:
+        if keepdims:
+            return t
+        else:
+            return tr.core.squeeze(t, modes=modes)
 
 
 def mean(t):
@@ -688,7 +767,44 @@ def derive(t, modes=None, order=1):
     return tt.vector.from_list(cores)
 
 
-def shift_mode(t, n, shift, eps='same'):
+def transpose(t, order, **kwargs):
+    """
+    Like NumPy's transpose(). Uses cross-approximation
+    """
+
+    ticks_list = [np.arange(t.n[n]) for n in range(t.d)]
+    ticks_list = [ticks_list[o] for o in order]
+
+    def fun(Xs):
+        Xs = Xs.copy()
+        Xs = Xs[:, np.argsort(order)]
+        return tr.core.sparse_reco(t, Xs)
+
+    return tr.core.cross(ticks_list=ticks_list, fun=fun, **kwargs)
+
+
+def transpose(t, order, eps):
+    N = t.d
+    idx = np.empty(len(order))
+    idx[order] = np.arange(len(order))
+
+    k = 0
+    while True:
+        # Find next inversion
+        nk = k
+        while (nk < N - 1) and (idx[nk] < idx[nk + 1]):
+            nk += 1
+        if nk == N - 1:
+            break
+        print(k, nk)
+        k = nk
+        idx[[k, k + 1]] = idx[[k + 1, k]]
+        t = shift_mode(t, k, shift=1, eps=eps)
+        k = max(k - 1, 0)
+    return t
+
+
+def shift_mode(t, n, shift, eps=1e-3, mode='swap', **kwargs):
     """
     Shift a mode back or forth within a TT
 
@@ -702,9 +818,21 @@ def shift_mode(t, n, shift, eps='same'):
 
     N = t.d
     assert 0 <= n + shift < N
+    assert mode in ('cross', 'swap')
 
     if shift == 0:
         return copy.deepcopy(t)
+
+    if mode == 'cross':
+        order = list(range(N))
+        del order[n]
+        if shift < 0:
+            order.insert(n+shift, n)
+        else:
+            order.insert(n+shift, n)
+        print('order:', order)
+        return transpose(t, order, eps=eps, **kwargs)
+
     cores = copy.deepcopy(tt.vector.to_list(t))
     tr.core.orthogonalize(cores, n)
     sign = np.sign(shift)
@@ -722,17 +850,31 @@ def shift_mode(t, n, shift, eps='same'):
         R3 = cores[c2].shape[2]
         I1 = cores[c1].shape[1]
         I2 = cores[c2].shape[1]
-        sc = np.einsum('iaj,jbk->iabk', cores[c1], cores[c2], optimize=True)
+        sc = np.einsum('iaj,jbk->iabk', cores[c1], cores[c2], optimize=False)
         sc = np.transpose(sc, [0, 2, 1, 3])
         sc = np.reshape(sc, [sc.shape[0]*sc.shape[1], sc.shape[2]*sc.shape[3]])
         if eps == 'same':
             left, right = tr.core.truncated_svd(sc, eps=0, rmax=R2, left_ortho=left_ortho)
-        else:
+        elif eps >= 0:
             left, right = tr.core.truncated_svd(sc, eps=eps/np.sqrt(np.abs(shift)), left_ortho=left_ortho)
+        else:
+            raise ValueError("Relative error '{}' not recognized".format(eps))
         newR2 = left.shape[1]
         cores[c1] = np.reshape(left, [R1, I2, newR2])
         cores[c2] = np.reshape(right, [newR2, I1, R3])
     return tt.vector.from_list(cores)
+
+
+def stack(ts, axis, **kwargs):
+    """
+    Similar to NumPy's stack function
+    """
+
+    assert len(axis) == 1
+
+    for i in range(len(ts)):
+        ts[i] = tr.core.insert_dummies(t, axis)
+    return tr.core.concatenate(ts, axis=axis, **kwargs)
 
 
 def concatenate(ts, axis, eps=0, rmax=np.iinfo(np.int32).max, verbose=False):
@@ -759,19 +901,16 @@ def concatenate(ts, axis, eps=0, rmax=np.iinfo(np.int32).max, verbose=False):
         del check[axis]
         if not all(t1.n[check] == t2.n[check]):
             raise ValueError('For concatenation, both tensors must have equal sizes along all (but one) modes')
-
         cores1 = tt.vector.to_list(t1)
         cores2 = tt.vector.to_list(t2)
         cores = []
         for n in range(N):
             if n != axis:
-                core = np.zeros([cores1[n].shape[0] + cores2[n].shape[0], cores1[n].shape[1], cores1[n].shape[2] +
-                                 cores2[n].shape[2]])
+                core = np.zeros([cores1[n].shape[0] + cores2[n].shape[0], cores1[n].shape[1], cores1[n].shape[2] + cores2[n].shape[2]])
                 core[:cores1[n].shape[0], :, :cores1[n].shape[2]] = cores1[n]
                 core[cores1[n].shape[0]:, :, cores1[n].shape[2]:] = cores2[n]
             else:
-                core = np.zeros([cores1[n].shape[0] + cores2[n].shape[0], cores1[n].shape[1] + cores2[n].shape[1],
-                                 cores1[n].shape[2] + cores2[n].shape[2]])
+                core = np.zeros([cores1[n].shape[0] + cores2[n].shape[0], cores1[n].shape[1] + cores2[n].shape[1], cores1[n].shape[2] + cores2[n].shape[2]])
                 core[:cores1[n].shape[0], :cores1[n].shape[1], :cores1[n].shape[2]] = cores1[n]
                 core[cores1[n].shape[0]:, cores1[n].shape[1]:, cores1[n].shape[2]:] = cores2[n]
             if n == 0:
@@ -801,3 +940,29 @@ def concatenate(ts, axis, eps=0, rmax=np.iinfo(np.int32).max, verbose=False):
     for key in sorted(d.keys())[::-1]:
         result = concatenate_pair(result, d[key], axis=axis)
     return result
+
+
+def get_row(ttm, row):
+    """
+    Read a row from a TT matrix
+
+    :param ttm: a TT matrix
+    :param row: a list encoding a multiindex
+    :return: a TT vector
+    """
+
+    slices = [slice(r, r+n*m, n) for r, n, m in zip(row, ttm.n, ttm.m)]
+    return ttm.tt[slices]
+
+
+def get_col(ttm, col):
+    """
+    Read a column from a TT matrix
+
+    :param ttm: a TT matrix
+    :param col: a list encoding a multiindex
+    :return: a TT vector
+    """
+
+    slices = [slice(c*n, c*n+n) for c, n, m in zip(col, ttm.n, ttm.m)]
+    return ttm.tt[slices]
