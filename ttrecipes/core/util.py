@@ -873,7 +873,7 @@ def stack(ts, axis, **kwargs):
     assert len(axis) == 1
 
     for i in range(len(ts)):
-        ts[i] = tr.core.insert_dummies(t, axis)
+        ts[i] = tr.core.insert_dummies(ts[i], axis)
     return tr.core.concatenate(ts, axis=axis, **kwargs)
 
 
