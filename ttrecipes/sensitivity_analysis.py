@@ -2,8 +2,10 @@
 """
 Higher-level functions to gather many sensitivity analysis metrics
 from N-dimensional black-box functions approximated as TT tensors.
+
 Todo:
     * Add derivative-based and histogram-based metrics
+
 """
 
 # -----------------------------------------------------------------------------
@@ -50,7 +52,7 @@ import tt
 import ttrecipes as tr
 
 
-def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
+def var_metrics(fun=None, axes=None, t=None, default_bins=100, effective_threshold=0.95,
                 dist_fraction=0.00005, fun_mode="array",
                 eps=1e-5, verbose=False, cross_kwargs=None, random_seed=None,
                 max_order=2, show=True):
@@ -67,7 +69,7 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
             If the domain and the distribution function are both undefined,
             a uniform(0, 1) distribution is assumed for the axis.
 
-            axis: dict(name, domain, dist)
+            axis: dict(name, domain, dist, display_name=None)
                 name (str): Variable name. Defaults to x_{i} (i = axis index).
 
                 domain (tuple or np.ndarray): Domain definition.
@@ -83,6 +85,10 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
                     scipy.stats.rv_continuous-> frozen scipy.stats distribution
                     np.ndarray -> values of the marginal PDF at the sampled domain positions.
                         In this case, domain must contain a np.ndarray of the same size.
+
+                display_name (str, optional): Variable name using LaTeX fomat. Defaults to None
+        t: a tensor to compute sensitivity indices of. Either `t` or `fun` must be given (but not both). Unlike `fun`,
+        `t` does not necessarily require `axes`
 
         default_bins (int, optional): Number of bins for axes without explicit
             definition. Defaults to 100.
@@ -159,8 +165,14 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
 
     """
 
-    N = len(axes)
 
+    if fun is None:
+        assert t is not None
+        axes = [dict(name='x_{}'.format(n), domain=np.arange(t.n[n])) for n in range(t.d)]
+    if t is None:
+        assert fun is not None
+        assert axes is not None
+    N = len(axes)
     names, ticks_list, marginals = tr.models.parse_axes(
         axes, default_bins=default_bins, dist_fraction=dist_fraction)
 
@@ -175,16 +187,21 @@ def var_metrics(fun, axes, default_bins=100, effective_threshold=0.95,
 
     if verbose:
         print("\n-> Building surrogate model")
-    model_time = time.time()
     pdf = tt.vector.from_list([marg[np.newaxis, :, np.newaxis] for marg in marginals])
 
     def fun_premultiplied(Xs):
         return fun(Xs) * tr.core.sparse_reco(pdf, tr.core.coordinates_to_indices(Xs, ticks_list=ticks_list))
 
-    tt_pdf, n_samples = tr.core.cross(ticks_list, fun_premultiplied, mode=fun_mode,
-                                      return_n_samples=True, eps=eps, verbose=verbose,
-                                      **cross_kwargs)
-    model_time = time.time() - model_time
+    if t is None:
+        model_time = time.time()
+        tt_pdf, n_samples = tr.core.cross(ticks_list, fun_premultiplied, mode=fun_mode,
+                                          return_n_samples=True, eps=eps, verbose=verbose,
+                                          **cross_kwargs)
+        model_time = time.time() - model_time
+    else:
+        tt_pdf = t*pdf
+        n_samples = None
+        model_time = None
 
     if verbose:
         print("\n-> Computing sensitivity metrics")
@@ -409,21 +426,21 @@ def tabulate_metrics(metrics, max_order=None,
     return outputs
 
 
-def query_sobol(STT, include=(), exclude=(), min_order=1, max_order=None,
+def query_sobol(st, include=(), exclude=(), min_order=1, max_order=None,
                 mode='highest', index_type='standard',
                 eps=1e-6, verbose=False, **kwargs):
     """Interface to query sensitivity metrics: find a tuple of variables satisfying certain criteria.
 
     Args:
-        STT (object): A Sobol Tensor Train object from ttpy or a 'metrics' dictionary,
+        st (object): A Sobol TT or a 'metrics' dictionary,
             typically obtained from: metrics = var_metrics(...))
         include (list): List of variables that must appear in the result.
-            When STT is a ttpy vector, it has to be a list of integers with the
-            indices of the variables. When STT is a 'metrics' dictionary, it may
+            When `st` is a ttpy vector, it has to be a list of integers with the
+            indices of the variables. When `st` is a 'metrics' dictionary, it may
             also be a list of strings with the names of the variables.
         exclude (list): List of variables that must NOT appear in the result.
-            When STT is a ttpy vector, it has to be a list of integers with the
-            indices of the variables. When STT is a 'metrics' dictionary, it may
+            When `st` is a ttpy vector, it has to be a list of integers with the
+            indices of the variables. When `st` is a 'metrics' dictionary, it may
             also be a list of strings with the names of the variables.
         min_order (int, optional): consider only tuples of this order or above.
             Defaults to 1
@@ -440,15 +457,15 @@ def query_sobol(STT, include=(), exclude=(), min_order=1, max_order=None,
         (tuple, value): the best variables, and their index
 
     """
-    if isinstance(STT, tt.core.vector.vector):
-        st = STT
+    if isinstance(st, tt.core.vector.vector):
+        st = st
         names = None
-    elif isinstance(STT, dict) and '_tr_info' in STT and 'stt' in STT['_tr_info']['tags']:
-        st = STT['_tr_info']['st']
-        names = [axis[0] for axis in STT['_tr_info']['axes']]
+    elif isinstance(st, dict) and '_tr_info' in st and 'stt' in st['_tr_info']['tags']:
+        names = [axis[0] for axis in st['_tr_info']['axes']]
         names_idx = dict([(name, i) for i, name in enumerate(names)])
         include = [i if isinstance(i, int) else names_idx[i] for i in include]
         exclude = [i if isinstance(i, int) else names_idx[i] for i in exclude]
+        st = st['_tr_info']['st']
     else:
         raise ValueError("'STT' must be a ttpy vector or a 'metrics' object")
 
@@ -476,6 +493,9 @@ def query_sobol(STT, include=(), exclude=(), min_order=1, max_order=None,
         mask2[n] = np.array([1, 0])[np.newaxis, :, np.newaxis]
     mask2 = tt.vector.from_list(mask2)
 
+    mask12 = mask1*mask2
+    mask12 = mask12 - tr.core.hamming_weight(N)*eps  # Tiny gradient to follow
+
     # Last mask: order bounds
     hws = tr.core.hamming_weight_state(N)
     cores = tt.vector.to_list(hws)
@@ -487,11 +507,11 @@ def query_sobol(STT, include=(), exclude=(), min_order=1, max_order=None,
 
     if mode == 'highest':
         st = tt.multifuncrs2([st, mask3], lambda x: x[:, 0] * x[:, 1],
-                             eps=eps, verb=verbose, **kwargs) * mask1 * mask2
+                             eps=eps, verb=verbose, **kwargs) * mask12
         val, point = tr.core.maximize(st)
     elif mode == 'lowest':  # Shift down by one so that the masks' zeroing-out works as intended
         st = tt.multifuncrs2([st - tr.core.constant_tt(st.n), mask3], lambda x: x[:, 0] * x[:, 1],
-                             eps=eps, verb=verbose, **kwargs) * mask1 * mask2
+                             eps=eps, verb=verbose, **kwargs) * mask12
         val, point = tr.core.minimize(st)
         val += 1  # Shift the value back up
     else:
