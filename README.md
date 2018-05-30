@@ -30,7 +30,7 @@ You can also run and interact with the notebook online using Binder: [![Binder](
 
 ## Installation
 
-_ttrecipes_ depends on [ttpy](https://github.com/oseledets/ttpy) and some common scientific computation packages (SciPy, NumPy, etc.). The provided _requirements.txt_ and _environment.yml_ files list these important dependencies for an easy installation using __conda__ or __pip__, whatever you prefer. It is recommended to create a new virtual environment for your project and then install _ttrecipes_ and its dependencies in the following way:
+_ttrecipes_ depends on [ttpy](https://github.com/oseledets/ttpy) and other common scientific computation packages (SciPy, NumPy, etc). The provided _requirements.txt_ and _environment.yml_ files list these important dependencies for an easy installation using __conda__ or __pip__, whatever you prefer. It is recommended to create a new virtual environment for your project and then install _ttrecipes_ and its dependencies in the following way:
 
     git clone https://github.com/rballester/ttrecipes.git
     cd ttrecipes
@@ -43,9 +43,9 @@ Or, if you prefer __pip__, install the required packages with these commands:
 
     pip install -r requirements.txt
 
-__ttpy__ has not yet been installed at this point because it needs to be installed _after_ those basic dependencies. Thus, run these two last commands to install __ttpy__ and __ttrecipes__ (in editable mode):
+__ttpy__ has not yet been installed at this point because it needs to be installed _after_ those basic dependencies. Thus, run these two last commands to install the current versions of __ttpy__ and __ttrecipes__ (in editable mode):
 
-    pip install ttpy
+    pip install git+https://github.com/oseledets/ttpy#egg=ttpy
     pip install -e .
 
 ## Project Structure

@@ -2,5 +2,5 @@
 
 ## postBuild configuration script for Binder (https://mybinder.org/)
 conda install gcc
-pip install ttpy
+pip install git+https://github.com/oseledets/ttpy#egg=ttpy
 pip install -e .
