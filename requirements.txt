@@ -1,7 +1,6 @@
 # run: pip install -r requirements.txt
+numpy
+scipy
 six
 cython
-numpy
-git+https://github.com/oseledets/ttpy@4e4cf970fad9a4ad39efcab3d009326a71113a49#egg=ttpy
-
-
+matplotlib

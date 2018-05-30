@@ -25,29 +25,27 @@ Example of surrogate modeling interactive navigation (a [gradient boosting regre
 
 See the [```examples/```](https://github.com/rballester/ttrecipes/tree/master/examples) folder for some sample scripts. Check out [this Jupyter Notebook](https://github.com/rballester/ttrecipes/blob/master/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb) for the examples used in our paper [Tensor Approximation of Advanced Metrics for Sensitivity Analysis](https://arxiv.org/abs/1712.01633).
 
-You can also run and interact with the notebook online using Binder or Microsoft Azure Notebooks (a free Azure account is needed).
+You can also run and interact with the notebook online using Binder: [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
 
-[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
-[![Azure Notebooks](https://notebooks.azure.com/launch.png)](https://notebooks.azure.com/egparedes/libraries/ttrecipes/html/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb)
 
 ## Installation
 
-_ttrecipes_ depends on the current [development branch of ttpy](https://github.com/oseledets/ttpy/tree/develop). The provided files _requirements.txt_ and _environment.yml_ will make sure the correct version is used. The recommended way to install _ttrecipes_ and its dependencies is:
+_ttrecipes_ depends on [ttpy](https://github.com/oseledets/ttpy) and some common scientific computation packages (SciPy, NumPy, etc.). The provided _requirements.txt_ and _environment.yml_ files list these important dependencies for an easy installation using __conda__ or __pip__, whatever you prefer. It is recommended to create a new virtual environment for your project and then install _ttrecipes_ and its dependencies in the following way:
 
     git clone https://github.com/rballester/ttrecipes.git
     cd ttrecipes
 
-If you use __conda__, you can create an environment with all the dependencies:
+If you use __conda__, you can create an environment (called _ttrecipes_ by default) with the required dependencies:
 
     conda env create --file environment.yml
 
 Or, if you prefer __pip__, install the required packages with these commands:
 
-    pip install numpy cython
     pip install -r requirements.txt
 
-In both cases, run this last command to install __ttrecipes__ in editable mode:
+__ttpy__ has not yet been installed at this point because it needs to be installed _after_ those basic dependencies. Thus, run these two last commands to install __ttpy__ and __ttrecipes__ (in editable mode):
 
+    pip install ttpy
     pip install -e .
 
 ## Project Structure
