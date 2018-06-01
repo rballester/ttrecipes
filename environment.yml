@@ -8,5 +8,6 @@ dependencies:
 - six
 - cython
 - matplotlib
-- pip:
-  - git+https://github.com/oseledets/ttpy@4e4cf970fad9a4ad39efcab3d009326a71113a49#egg=ttpy
+#- gcc             ## Optional install of gfortran compiler (required for ttpy) with conda
+#- pip:            ## Optional install of ttpy with conda 
+#  - ttpy
