@@ -102,8 +102,11 @@ def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samp
         if len(where) > 0:
             raise ValueError('Infinite detected in cross-approximation: indices = {}, coords = {}'.format(Xs[where[0], :], coordinates[where[0], :]))
 
-    all_Xs = []
-    all_values = []
+    global n_samples
+    n_samples = 0
+    if stats:
+        all_Xs = []
+        all_values = []
 
     if mode == "parameters":
         def f(Xs):
@@ -113,16 +116,20 @@ def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samp
                 values.append(fun(*x))
             values = np.array(values)
             check_values(Xs, coordinates, values)
-            all_Xs.extend(list(Xs))
-            all_values.extend(list(values))
+            n_samples += len(Xs)
+            if stats:
+                all_Xs.extend(list(Xs))
+                all_values.extend(list(values))
             return values
     elif mode == "array":
         def f(Xs):
             coordinates = indices_to_coordinates(Xs)
             values = fun(coordinates)
             check_values(Xs, coordinates, values)
-            all_Xs.extend(list(Xs))
-            all_values.extend(list(values))
+            n_samples += len(Xs)
+            if stats:
+                all_Xs.extend(list(Xs))
+                all_values.extend(list(values))
             return values
 
     grids = tr.core.meshgrid(shape)
@@ -130,7 +137,6 @@ def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samp
         print("Cross-approximating a {}D function with target error {}...".format(N, eps))
         start = time.time()
     result = tt.multifuncrs2(grids, f, eps=eps, verb=verbose, **kwargs)
-    n_samples = len(all_Xs)
     if verbose:
         total_time = time.time() - start
         print('Function evaluations: {} in {} seconds (time/evaluation: {})'.format(n_samples, total_time, total_time /
