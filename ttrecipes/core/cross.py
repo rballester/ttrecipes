@@ -110,6 +110,7 @@ def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samp
 
     if mode == "parameters":
         def f(Xs):
+            global n_samples
             values = []
             coordinates = indices_to_coordinates(Xs)
             for x in coordinates:
@@ -123,6 +124,7 @@ def cross(ticks_list, fun, mode="array", qtt=False, callback=None, return_n_samp
             return values
     elif mode == "array":
         def f(Xs):
+            global n_samples
             coordinates = indices_to_coordinates(Xs)
             values = fun(coordinates)
             check_values(Xs, coordinates, values)
