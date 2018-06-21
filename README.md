@@ -30,22 +30,30 @@ You can also run and interact with the notebook online using Binder: [![Binder](
 
 ## Installation
 
-_ttrecipes_ depends on [ttpy](https://github.com/oseledets/ttpy) and other common scientific computation packages (SciPy, NumPy, etc). The provided _requirements.txt_ and _environment.yml_ files list these important dependencies for an easy installation using __conda__ or __pip__, whatever you prefer. It is recommended to create a new virtual environment for your project and then install _ttrecipes_ and its dependencies in the following way:
+_ttrecipes_ depends on [ttpy](https://github.com/oseledets/ttpy) and other common scientific computation packages (SciPy, NumPy, etc). The provided _environment.yml_, _requirements.txt_ and _ttpy\_repo.txt_ files collect these dependencies for an easy installation using __conda__ or __pip__ respectively. As usual, it is recommended to create a new Python environment for the project.
 
-    git clone https://github.com/rballester/ttrecipes.git
-    cd ttrecipes
-
-If you use __conda__, you can create an environment (called _ttrecipes_ by default) with the required dependencies:
+### Basic dependencies
+If you use __conda__, you can create an environment (called _ttrecipes_ by default) with the required dependencies already installed with the following command:
 
     conda env create --file environment.yml
 
-Or, if you prefer __pip__, install the required packages with these commands:
+Or, if you prefer, you can also use __pip__ to install the required packages:
 
     pip install -r requirements.txt
 
-__ttpy__ has not yet been installed at this point because it needs to be installed _after_ those basic dependencies. Thus, run these two last commands to install the current versions of __ttpy__ and __ttrecipes__ (in editable mode):
+Do not forget to activate the newly created environment with _'conda activate'_ or _'source activate'_.
 
-    pip install git+https://github.com/oseledets/ttpy#egg=ttpy
+
+### ttpy
+__ttpy__ needs to be explicitly installed _after_ the basic dependencies. To install a version compatible with __ttrecipes__, run the following _pip_ command:
+
+    pip install -r ttpy_repo.txt
+
+### ttrecipes
+Once the dependencies are ready, install __ttrecipes__ by cloning this repository and running _'pip install'_ with the current version in editable mode:
+
+    git clone https://github.com/rballester/ttrecipes.git
+    cd ttrecipes
     pip install -e .
 
 ## Project Structure

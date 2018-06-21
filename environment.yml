@@ -8,6 +8,8 @@ dependencies:
 - six
 - cython
 - matplotlib
-#- gcc             ## Optional install of gfortran compiler (required for ttpy) with conda
-#- pip:            ## Optional install of ttpy with conda 
-#  - ttpy
+## Optional gFortran install with conda since some versions of gFortran 5.0-8.0 had a bug
+## preventing a successful ttpy compilation
+#- gcc<5.0|>=9.0
+#- pip:
+#  - git+https://github.com/oseledets/ttpy#egg=ttpy

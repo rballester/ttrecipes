@@ -1,0 +1,2 @@
+# run: pip install -r ttpy_repo.txt
+git+https://github.com/oseledets/ttpy#egg=ttpy
