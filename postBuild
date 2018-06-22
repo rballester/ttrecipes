@@ -3,3 +3,11 @@
 conda install 'gcc<5.0|>=9.0'
 pip install -r ttpy_repo.txt
 pip install -e .
+
+# Google analytics extension
+pip install nbgoogleanalytics
+jupyter nbextension install --py --sys-prefix nbgoogleanalytics
+jupyter nbextension enable --py --sys-prefix nbgoogleanalytics
+jupyter serverextension enable --sys-prefix nbgoogleanalytics
+jupyter notebook --generate-config
+echo 'c.GoogleAnalytics.tracking_id="UA-121211479-1"' >> $HOME/.jupyter/jupyter_notebook_config.py
