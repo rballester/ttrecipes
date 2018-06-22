@@ -48,6 +48,8 @@ Do not forget to activate the newly created environment with _'conda activate'_ 
 __ttpy__ needs to be explicitly installed _after_ the basic dependencies. To install a version compatible with __ttrecipes__, run the following _pip_ command:
 
     pip install -r ttpy_repo.txt
+    
+**Important:** due to a bug in some releases of the _gfortran_ compiler in versions 5.0-8.0, the installation of __ttpy__ may fail ([issue #60](https://github.com/oseledets/ttpy/issues/60)). If this is your case, try to use a different _gfortran_ version (e.g. gfortran-4.8) or a different compiler (e.g. ifort).
 
 ### ttrecipes
 Once the dependencies are ready, install __ttrecipes__ by cloning this repository and running _'pip install'_ with the current version in editable mode:
