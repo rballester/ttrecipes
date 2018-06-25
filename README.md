@@ -8,7 +8,7 @@
 - [Cross-approximation](http://www.mat.uniroma2.it/~tvmsscho/papers/Tyrtyshnikov5.pdf) wrapper for building tensors and surrogate modeling ([```cross.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/cross.py))
 - Completion and regression ([```completion.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/completion.py))
 - Sampling schemes for parameter spaces ([```sampling.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sampling.py))
-- Variance-based sensitivity analysis: Sobol indices, Shapley values, effective dimensions, etc. ([```sensitivity_indices.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sensitivity_indices.py), [```sensitivity_analysis.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/sensitivity_analysis.py))
+- Variance-based sensitivity analysis: Sobol indices, Shapley values, effective dimensions, etc. ([```sensitivity_indices.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sensitivity_indices.py), [```sensitivity_analysis.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/sensitivity_analysis.py)) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
 - Mask tensors and TTs that behave like deterministic finite automata ([```masks.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/masks.py), [```sets.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/core/sets.py))
 - Visualization of TT tensors ([```mpl.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/mpl.py), [```tikz.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/tikz.py))
 - A library of analytical models from physics, engineering, and computational science ([```models.py```](https://github.com/rballester/ttrecipes/blob/master/ttrecipes/models.py))
@@ -23,9 +23,7 @@ Example of surrogate modeling interactive navigation (a [gradient boosting regre
 
 [<img src="https://github.com/rballester/ttrecipes/raw/master/images/fire_spread_sensitivity.png" width="768" title="Fire-spread sensitivity">](https://github.com/rballester/ttrecipes/raw/master/images/fire_spread_sensitivity.png)
 
-See the [```examples/```](https://github.com/rballester/ttrecipes/tree/master/examples) folder for some sample scripts. Check out [this Jupyter Notebook](https://github.com/rballester/ttrecipes/blob/master/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb) for the examples used in our paper [Tensor Approximation of Advanced Metrics for Sensitivity Analysis](https://arxiv.org/abs/1712.01633).
-
-You can also run and interact with the notebook online using Binder: [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
+See the [```examples/```](https://github.com/rballester/ttrecipes/tree/master/examples) folder for some sample scripts. Check out [this Jupyter Notebook](https://github.com/rballester/ttrecipes/blob/master/examples/sensitivity_analysis/Sensitivity%20Analysis%20Examples.ipynb) for the examples used in our paper [Tensor Approximation of Advanced Metrics for Sensitivity Analysis](https://arxiv.org/abs/1712.01633). You can also run and interact with the notebook online using Binder [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rballester/ttrecipes.git/master?filepath=examples%2Fsensitivity_analysis%2FSensitivity%20Analysis%20Examples.ipynb)
 
 
 ## Installation
