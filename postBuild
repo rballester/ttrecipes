@@ -5,7 +5,12 @@ pip install -r ttpy_repo.txt
 pip install -e .
 
 # Google analytics extension
-pip install nbgoogleanalytics
+## Original version:
+##pip install nbgoogleanalytics
+## Let Google Analytics manage DNT:
+pip install git+https://github.com/yuvipanda/nbgoogleanalytics.git@36114604ba3f3054bf40c608d7d100ee9857d58c#egg=nbgoogleanalytics
+sed -i -e '15,19d;29d' /srv/conda/lib/python3.6/site-packages/nbgoogleanalytics/static/main.js
+##--
 jupyter nbextension install --py --sys-prefix nbgoogleanalytics
 jupyter nbextension enable --py --sys-prefix nbgoogleanalytics
 jupyter serverextension enable --sys-prefix nbgoogleanalytics
