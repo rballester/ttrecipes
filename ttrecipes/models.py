@@ -1254,7 +1254,7 @@ def get_ebola_spread(country='Liberia'):
                 dict(name='beta_3', domain=(0.05, 0.2)),
                 dict(name='rho_1', domain=(0.41, 1)),
                 dict(name='gamma_1', domain=(0.0276, 0.1702)),
-                dict(name='gamma_1', domain=(0.081, 0.21)),
+                dict(name='gamma_2', domain=(0.081, 0.21)),
                 dict(name='omega', domain=(0.25, 0.5)),
                 dict(name='phi', domain=(0.0833, 0.7))]
     else:
@@ -1263,7 +1263,7 @@ def get_ebola_spread(country='Liberia'):
                 dict(name='beta_3', domain=(0.05, 0.2)),
                 dict(name='rho_1', domain=(0.41, 1)),
                 dict(name='gamma_1', domain=(0.0275, 0.1569)),
-                dict(name='gamma_1', domain=(0.1236, 0.384)),
+                dict(name='gamma_2', domain=(0.1236, 0.384)),
                 dict(name='omega', domain=(0.25, 0.5)),
                 dict(name='phi', domain=(0.0833, 0.7))]
 
