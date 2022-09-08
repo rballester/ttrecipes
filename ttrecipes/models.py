@@ -1268,3 +1268,22 @@ def get_ebola_spread(country='Liberia'):
                 dict(name='phi', domain=(0.0833, 0.7))]
 
     return function, axes
+
+
+def get_nassau_county():
+
+    def function(Xs):
+        seats = np.array([[2, 2, 21, 28, 31, 31]]).T
+        majority = np.ceil((np.sum(seats)+1)/2)
+        return np.matmul(Xs, seats) >= majority
+
+    axes = [
+        dict(name='Long Beach', domain=(-0.5, 1.5)),
+        dict(name='Glen Cove', domain=(-0.5, 1.5)),
+        dict(name='Oyster Bay', domain=(-0.5, 1.5)),
+        dict(name='North Hampstead', domain=(-0.5, 1.5)),
+        dict(name='Hampstead 1', domain=(-0.5, 1.5)),
+        dict(name='Hampstead 2', domain=(-0.5, 1.5)),
+    ]
+
+    return function, axes
